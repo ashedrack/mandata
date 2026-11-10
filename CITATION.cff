@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Mandata: The mandate toolkit for agent-initiated payments"
+authors:
+  - family-names: Aji
+    given-names: Shedrack Chiedozie
+    orcid: "https://orcid.org/0009-0007-0823-2112"
+version: 0.1.0
+date-released: 2026-11-10
+url: "https://github.com/ashedrack/mandata"
+license: Apache-2.0
