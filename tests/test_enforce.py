@@ -4,8 +4,13 @@ from mandata import Bounds, EvidenceLog, Mandate, enforce
 
 
 def make_mandate(**over):
-    b = Bounds(max_amount=500.0, currency="GBP", allowed_payees=["store.example"],
-               expires_in_days=30, velocity_limit=2)
+    b = Bounds(
+        max_amount=500.0,
+        currency="GBP",
+        allowed_payees=["store.example"],
+        expires_in_days=30,
+        velocity_limit=2,
+    )
     m = Mandate(principal="user:alice", agent="agent:bot", bounds=b)
     for k, v in over.items():
         setattr(m, k, v)
@@ -31,8 +36,7 @@ def test_rejects_unlisted_payee():
 
 
 def test_rejects_wrong_currency():
-    d = enforce(make_mandate(), "store.example", 10.0, currency="USD",
-                evidence_log=EvidenceLog())
+    d = enforce(make_mandate(), "store.example", 10.0, currency="USD", evidence_log=EvidenceLog())
     assert not d.allowed and "outside mandate" in d.reason
 
 
@@ -64,9 +68,14 @@ def test_evidence_chain_detects_tampering():
     enforce(m, "store.example", 10.0, evidence_log=log)
     assert log.verify_chain()
     tampered = log.records[0].__class__(
-        mandate_id=log.records[0].mandate_id, agent=log.records[0].agent,
-        payee=log.records[0].payee, amount=999.0, allowed=True,
-        reason="forged", timestamp=log.records[0].timestamp,
-        prev_hash=log.records[0].prev_hash)
+        mandate_id=log.records[0].mandate_id,
+        agent=log.records[0].agent,
+        payee=log.records[0].payee,
+        amount=999.0,
+        allowed=True,
+        reason="forged",
+        timestamp=log.records[0].timestamp,
+        prev_hash=log.records[0].prev_hash,
+    )
     log.records[0] = tampered
     assert not log.verify_chain()

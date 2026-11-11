@@ -55,7 +55,7 @@ class Decision:
 
     allowed: bool
     reason: str
-    evidence: "EvidenceRecord"
+    evidence: EvidenceRecord
 
 
 @dataclass(frozen=True)

@@ -11,8 +11,8 @@ import hashlib
 import time
 from dataclasses import dataclass
 
-from nacl.signing import SigningKey, VerifyKey
 from nacl.exceptions import BadSignatureError
+from nacl.signing import SigningKey, VerifyKey
 
 from .models import Mandate
 
@@ -21,10 +21,7 @@ def bounds_hash(mandate: Mandate) -> str:
     """Canonical hash of the mandate's bounds — the thing credentials sign over."""
     b = mandate.bounds
     payees = ",".join(sorted(b.allowed_payees))
-    payload = (
-        f"{b.max_amount}|{b.currency}|{payees}|"
-        f"{b.expires_in_days}|{b.velocity_limit}"
-    )
+    payload = f"{b.max_amount}|{b.currency}|{payees}|{b.expires_in_days}|{b.velocity_limit}"
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
