@@ -19,18 +19,25 @@ def enforce(
     evidence_log: EvidenceLog | None = None,
     store=None,
     registry=None,
+    hooks=(),
 ) -> Decision:
     """Evaluate a proposed transaction against its mandate.
 
     Returns a Decision with a linked evidence record. A rejection is also
     recorded — refusals are evidence too.
+
+    Optional ``hooks`` are callables invoked with the final Decision on every
+    call — wire the gate into metrics, alerting, or audit systems.
     """
     at = at or time.time()
     log = evidence_log or _DEFAULT_LOG
     b = mandate.bounds
 
     with mandate._lock:
-        return _evaluate_and_record(mandate, payee, amount, currency, at, log, b, store, registry)
+        decision = _evaluate_and_record(mandate, payee, amount, currency, at, log, b, store, registry)
+    for hook in hooks:
+        hook(decision)
+    return decision
 
 
 def _evaluate_and_record(mandate, payee, amount, currency, at, log, b, store, registry) -> Decision:
