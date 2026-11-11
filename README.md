@@ -59,7 +59,7 @@ principal issues mandate ──► credential binds mandate to agent
         └───────► evidence record appended (hash-chained audit log)
 ```
 
-See [`docs/architecture.md`](docs/architecture.md) for the full model and [`docs/mandate-model.md`](docs/mandate-model.md) for the schema.
+See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/mandate-model.md`](docs/mandate-model.md) for the schema, and [`docs/diagrams.md`](docs/diagrams.md) for the system design diagrams.
 
 ## Roadmap
 
