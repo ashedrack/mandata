@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -17,6 +18,8 @@ class Bounds:
     allowed_payees: tuple[str, ...] | list[str] = ()
     expires_in_days: int = 30
     velocity_limit: int = 0  # max transactions per day; 0 = unlimited
+    total_budget: float | None = None  # cumulative spend cap over window
+    budget_window_days: int = 30  # window for total_budget
 
 
 @dataclass
@@ -29,7 +32,14 @@ class Mandate:
     mandate_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     issued_at: float = field(default_factory=time.time)
     revoked: bool = False
-    _tx_timestamps: list[float] = field(default_factory=list, repr=False)
+    _state: object = field(default=None, repr=False)
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def __post_init__(self) -> None:
+        if self._state is None:
+            from .state import InMemoryStore
+
+            self._state = InMemoryStore()
 
     @property
     def expires_at(self) -> float:
@@ -41,12 +51,17 @@ class Mandate:
     def revoke(self) -> None:
         self.revoked = True
 
-    def record(self, at: float) -> None:
-        self._tx_timestamps.append(at)
+    def record(self, at: float, amount: float = 0.0) -> None:
+        self._state.record(self.mandate_id, at, amount)
 
     def velocity_used_today(self, at: float) -> int:
-        day = int(at // 86400)
-        return sum(1 for t in self._tx_timestamps if int(t // 86400) == day)
+        day_start = int(at // 86400) * 86400
+        count, _ = self._state.spend(self.mandate_id, day_start)
+        return count
+
+    def spend_in_window(self, at: float) -> tuple[int, float]:
+        since = at - self.bounds.budget_window_days * 86400
+        return self._state.spend(self.mandate_id, since)
 
 
 @dataclass(frozen=True)
