@@ -63,8 +63,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model and [`docs
 
 ## Roadmap
 
-- [ ] **v0.1** — Mandate model, bounds enforcement, evidence chain (Python)
-- [ ] Credential signing (Ed25519) + verification API
+- [x] **v0.1** — Mandate model, bounds enforcement, evidence chain (Python)
+- [x] Credential signing (Ed25519) + verification API
 - [ ] Revocation registry (mandate kill-switch at transaction speed)
 - [ ] TypeScript implementation
 - [ ] AP2 / x402 adapter layer

@@ -16,7 +16,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Security :: Cryptography",
 ]
-dependencies = []
+dependencies = ["pynacl>=1.5"]
 
 [project.urls]
 Homepage = "https://github.com/ashedrack/mandata"
