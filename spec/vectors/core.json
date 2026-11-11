@@ -1,0 +1,109 @@
+{
+  "version": "mmf-v0.1",
+  "description": "Core conformance vectors — one per check plus boundary cases. prior_txns seed state before evaluation (allowed records only).",
+  "vectors": [
+    {"id": "V01", "desc": "within bounds",
+     "mandate": {"bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com"], "expires_in_days": 30, "velocity_limit": 0}},
+     "tx": {"payee": "tesco.com", "amount": 49.99, "currency": "GBP", "at": 1000},
+     "expect": {"allowed": true, "check": "WITHIN"}},
+
+    {"id": "V02", "desc": "locally revoked",
+     "mandate": {"revoked": true, "bounds": {"max_amount": 500}},
+     "tx": {"payee": "x", "amount": 10, "at": 1000},
+     "expect": {"allowed": false, "check": "REVOKED"}},
+
+    {"id": "V03", "desc": "expired",
+     "mandate": {"bounds": {"max_amount": 500, "expires_in_days": 1}},
+     "tx": {"payee": "x", "amount": 10, "at": 90000},
+     "expect": {"allowed": false, "check": "EXPIRED"}},
+
+    {"id": "V04", "desc": "non-positive amount",
+     "mandate": {"bounds": {"max_amount": 500}},
+     "tx": {"payee": "x", "amount": 0, "at": 1000},
+     "expect": {"allowed": false, "check": "NON_POSITIVE"}},
+
+    {"id": "V05", "desc": "amount over cap",
+     "mandate": {"bounds": {"max_amount": 500}},
+     "tx": {"payee": "x", "amount": 500.01, "at": 1000},
+     "expect": {"allowed": false, "check": "CAP_EXCEEDED"}},
+
+    {"id": "V06", "desc": "amount exactly at cap — boundary allowed",
+     "mandate": {"bounds": {"max_amount": 500}},
+     "tx": {"payee": "x", "amount": 500, "at": 1000},
+     "expect": {"allowed": true, "check": "WITHIN"}},
+
+    {"id": "V07", "desc": "currency mismatch",
+     "mandate": {"bounds": {"max_amount": 500, "currency": "GBP"}},
+     "tx": {"payee": "x", "amount": 10, "currency": "USD", "at": 1000},
+     "expect": {"allowed": false, "check": "CURRENCY"}},
+
+    {"id": "V08", "desc": "currency omitted — no currency check",
+     "mandate": {"bounds": {"max_amount": 500, "currency": "GBP"}},
+     "tx": {"payee": "x", "amount": 10, "at": 1000},
+     "expect": {"allowed": true, "check": "WITHIN"}},
+
+    {"id": "V09", "desc": "payee not in allowlist",
+     "mandate": {"bounds": {"max_amount": 500, "allowed_payees": ["tesco.com"]}},
+     "tx": {"payee": "evil.io", "amount": 10, "at": 1000},
+     "expect": {"allowed": false, "check": "PAYEE"}},
+
+    {"id": "V10", "desc": "empty allowlist permits any payee",
+     "mandate": {"bounds": {"max_amount": 500, "allowed_payees": []}},
+     "tx": {"payee": "anything.example", "amount": 10, "at": 1000},
+     "expect": {"allowed": true, "check": "WITHIN"}},
+
+    {"id": "V11", "desc": "velocity limit reached (3 prior in window)",
+     "mandate": {"bounds": {"max_amount": 500, "velocity_limit": 3}},
+     "prior_txns": [{"at": 900, "amount": 10}, {"at": 950, "amount": 10}, {"at": 990, "amount": 10}],
+     "tx": {"payee": "x", "amount": 10, "at": 1000},
+     "expect": {"allowed": false, "check": "VELOCITY"}},
+
+    {"id": "V12", "desc": "velocity under limit — boundary allowed",
+     "mandate": {"bounds": {"max_amount": 500, "velocity_limit": 3}},
+     "prior_txns": [{"at": 900, "amount": 10}, {"at": 950, "amount": 10}],
+     "tx": {"payee": "x", "amount": 10, "at": 1000},
+     "expect": {"allowed": true, "check": "WITHIN"}},
+
+    {"id": "V13", "desc": "velocity limit 0 = unlimited",
+     "mandate": {"bounds": {"max_amount": 500, "velocity_limit": 0}},
+     "prior_txns": [{"at": 900, "amount": 10}, {"at": 950, "amount": 10}, {"at": 990, "amount": 10}],
+     "tx": {"payee": "x", "amount": 10, "at": 1000},
+     "expect": {"allowed": true, "check": "WITHIN"}},
+
+    {"id": "V14", "desc": "cumulative budget exceeded",
+     "mandate": {"bounds": {"max_amount": 500, "total_budget": 900, "budget_window_days": 30}},
+     "prior_txns": [{"at": 800, "amount": 420}, {"at": 900, "amount": 400}],
+     "tx": {"payee": "x", "amount": 100, "at": 1000},
+     "expect": {"allowed": false, "check": "BUDGET"}},
+
+    {"id": "V15", "desc": "cumulative budget at exact limit — boundary allowed",
+     "mandate": {"bounds": {"max_amount": 500, "total_budget": 900, "budget_window_days": 30}},
+     "prior_txns": [{"at": 800, "amount": 420}, {"at": 900, "amount": 400}],
+     "tx": {"payee": "x", "amount": 80, "at": 1000},
+     "expect": {"allowed": true, "check": "WITHIN"}},
+
+    {"id": "V16", "desc": "budget outside window does not count",
+     "mandate": {"bounds": {"max_amount": 500, "total_budget": 900, "budget_window_days": 1}},
+     "prior_txns": [{"at": 100, "amount": 850}],
+     "tx": {"payee": "x", "amount": 100, "at": 100000},
+     "expect": {"allowed": true, "check": "WITHIN"}},
+
+    {"id": "V17", "desc": "negative amount rejected",
+     "mandate": {"bounds": {"max_amount": 500}},
+     "tx": {"payee": "x", "amount": -50, "at": 1000},
+     "expect": {"allowed": false, "check": "NON_POSITIVE"}},
+
+    {"id": "V18", "desc": "revoked overrides in-bounds tx — first check wins",
+     "mandate": {"revoked": true, "bounds": {"max_amount": 500, "allowed_payees": ["x"]}},
+     "tx": {"payee": "x", "amount": 10, "at": 1000},
+     "expect": {"allowed": false, "check": "REVOKED"}},
+
+    {"id": "V19", "desc": "denied tx does not consume budget",
+     "mandate": {"bounds": {"max_amount": 500, "total_budget": 900, "budget_window_days": 30}},
+     "prior_txns": [{"at": 900, "amount": 400}],
+     "tx": {"payee": "x", "amount": 600, "at": 1000},
+     "then_tx": {"payee": "x", "amount": 500, "at": 1001},
+     "expect": {"allowed": false, "check": "CAP_EXCEEDED"},
+     "then_expect": {"allowed": true, "check": "WITHIN"}}
+  ]
+}
