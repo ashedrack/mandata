@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 
 from .models import EvidenceRecord
@@ -14,6 +15,7 @@ class EvidenceLog:
 
     def __init__(self) -> None:
         self.records: list[EvidenceRecord] = []
+        self._lock = threading.Lock()
 
     @property
     def head_hash(self) -> str:
@@ -29,17 +31,18 @@ class EvidenceLog:
         reason: str,
         timestamp: float | None = None,
     ) -> EvidenceRecord:
-        record = EvidenceRecord(
-            mandate_id=mandate_id,
-            agent=agent,
-            payee=payee,
-            amount=amount,
-            allowed=allowed,
-            reason=reason,
-            timestamp=timestamp or time.time(),
-            prev_hash=self.head_hash,
-        )
-        self.records.append(record)
+        with self._lock:
+            record = EvidenceRecord(
+                mandate_id=mandate_id,
+                agent=agent,
+                payee=payee,
+                amount=amount,
+                allowed=allowed,
+                reason=reason,
+                timestamp=timestamp or time.time(),
+                prev_hash=self.head_hash,
+            )
+            self.records.append(record)
         return record
 
     def verify_chain(self) -> bool:
