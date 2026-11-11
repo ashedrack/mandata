@@ -1,5 +1,7 @@
 # Mandata
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/ashedrack/mandata/badge)](https://securityscorecards.dev/viewer/?uri=github.com/ashedrack/mandata)
+
 **The mandate toolkit for agent-initiated payments.**
 
 When AI agents hold spending authority, someone must answer: *what exactly are they allowed to do — and can you prove it afterward?* Mandata is a reference implementation of the bounded-autonomy mandate chain:
