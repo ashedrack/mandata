@@ -1,5 +1,6 @@
 """Mandata — the mandate toolkit for agent-initiated payments."""
 
+from .delegation import delegate
 from .enforce import enforce
 from .evidence import EvidenceLog
 from .models import Bounds, Decision, EvidenceRecord, Mandate
@@ -19,5 +20,6 @@ __all__ = [
     "RevocationRegistry",
     "SQLiteStore",
     "StateStore",
+    "delegate",
     "enforce",
 ]

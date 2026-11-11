@@ -11,7 +11,7 @@ from mandata import Bounds, EvidenceLog, InMemoryRegistry, Mandate, enforce
 class MockRail:
     """Stand-in for AP2/x402/bank settlement — executes only what the gate allows."""
 
-    executed: "ClassVar[list]" = []
+    executed: ClassVar[list] = []
 
     @classmethod
     def settle(cls, payee, amount):

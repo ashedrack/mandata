@@ -34,7 +34,9 @@ def enforce(
     b = mandate.bounds
 
     with mandate._lock:
-        decision = _evaluate_and_record(mandate, payee, amount, currency, at, log, b, store, registry)
+        decision = _evaluate_and_record(
+            mandate, payee, amount, currency, at, log, b, store, registry
+        )
     for hook in hooks:
         hook(decision)
     return decision
