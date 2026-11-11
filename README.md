@@ -83,3 +83,14 @@ We welcome contributors — see [CONTRIBUTING.md](CONTRIBUTING.md). Good entry p
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE).
+
+## Demo app
+
+`examples/demo_app.py` runs a full simulated deployment over real HTTP — a
+revocation-registry service, a mock payment rail, and an agent whose every
+proposed payment goes through the gate: signed credentials, sub-agent
+delegation, x402 intake, compromise attempts, remote revocation, then a full
+evidence-chain audit. `python examples/demo_app.py` — stdlib only.
+
+For a shorter single-process walkthrough see `examples/end_to_end.py`.
+
