@@ -32,6 +32,7 @@ class Mandate:
     mandate_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     issued_at: float = field(default_factory=time.time)
     revoked: bool = False
+    parent_mandate_id: str | None = None
     _state: object = field(default=None, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 

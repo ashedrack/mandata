@@ -1,0 +1,10 @@
+{
+  "name": "mandata",
+  "version": "0.2.0",
+  "description": "Bounded spending authority for AI agents — the gate, not the rail.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "Apache-2.0",
+  "scripts": { "build": "tsc", "test": "node --test dist/" },
+  "devDependencies": { "typescript": "^5.4.0", "@types/node": "^20.0.0" }
+}
