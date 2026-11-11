@@ -18,6 +18,7 @@ def enforce(
     at: float | None = None,
     evidence_log: EvidenceLog | None = None,
     store=None,
+    registry=None,
 ) -> Decision:
     """Evaluate a proposed transaction against its mandate.
 
@@ -29,11 +30,13 @@ def enforce(
     b = mandate.bounds
 
     with mandate._lock:
-        return _evaluate_and_record(mandate, payee, amount, currency, at, log, b, store)
+        return _evaluate_and_record(mandate, payee, amount, currency, at, log, b, store, registry)
 
 
-def _evaluate_and_record(mandate, payee, amount, currency, at, log, b, store) -> Decision:
-    if mandate.revoked:
+def _evaluate_and_record(mandate, payee, amount, currency, at, log, b, store, registry) -> Decision:
+    if registry is not None and registry.is_revoked(mandate.mandate_id):
+        reason = "mandate revoked (registry)"
+    elif mandate.revoked:
         reason = "mandate revoked"
     elif mandate.is_expired(at):
         reason = "mandate expired"
