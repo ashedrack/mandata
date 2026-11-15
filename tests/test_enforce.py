@@ -20,18 +20,18 @@ def make_mandate(**over):
 def test_allows_within_bounds():
     log = EvidenceLog()
     m = make_mandate()
-    d = enforce(m, "store.example", 4999, evidence_log=log)
+    d = enforce(m, "store.example", 4999, evidence_log=log, currency="GBP")
     assert d.allowed and d.reason == "within mandate"
     assert log.verify_chain()
 
 
 def test_rejects_amount_over_cap():
-    d = enforce(make_mandate(), "store.example", 50001, evidence_log=EvidenceLog())
+    d = enforce(make_mandate(), "store.example", 50001, evidence_log=EvidenceLog(), currency="GBP")
     assert not d.allowed and "exceeds cap" in d.reason
 
 
 def test_rejects_unlisted_payee():
-    d = enforce(make_mandate(), "evil.example", 10, evidence_log=EvidenceLog())
+    d = enforce(make_mandate(), "evil.example", 10, evidence_log=EvidenceLog(), currency="GBP")
     assert not d.allowed and "not in allowed set" in d.reason
 
 
@@ -43,29 +43,29 @@ def test_rejects_wrong_currency():
 def test_rejects_expired():
     m = make_mandate()
     future = time.time() + 31 * 86400
-    d = enforce(m, "store.example", 10, at=future, evidence_log=EvidenceLog())
+    d = enforce(m, "store.example", 10, at=future, evidence_log=EvidenceLog(), currency="GBP")
     assert not d.allowed and d.reason == "mandate expired"
 
 
 def test_rejects_revoked():
     m = make_mandate()
     m.revoke()
-    d = enforce(m, "store.example", 10, evidence_log=EvidenceLog())
+    d = enforce(m, "store.example", 10, evidence_log=EvidenceLog(), currency="GBP")
     assert not d.allowed and d.reason == "mandate revoked"
 
 
 def test_velocity_limit():
     m, log = make_mandate(), EvidenceLog()
-    assert enforce(m, "store.example", 10, evidence_log=log).allowed
-    assert enforce(m, "store.example", 10, evidence_log=log).allowed
-    assert not enforce(m, "store.example", 10, evidence_log=log).allowed
+    assert enforce(m, "store.example", 10, evidence_log=log, currency="GBP").allowed
+    assert enforce(m, "store.example", 10, evidence_log=log, currency="GBP").allowed
+    assert not enforce(m, "store.example", 10, evidence_log=log, currency="GBP").allowed
 
 
 def test_evidence_chain_detects_tampering():
     log = EvidenceLog()
     m = make_mandate()
-    enforce(m, "store.example", 10, evidence_log=log)
-    enforce(m, "store.example", 10, evidence_log=log)
+    enforce(m, "store.example", 10, evidence_log=log, currency="GBP")
+    enforce(m, "store.example", 10, evidence_log=log, currency="GBP")
     assert log.verify_chain()
     tampered = log.records[0].__class__(
         mandate_id=log.records[0].mandate_id,

@@ -2,56 +2,725 @@
   "version": "mmf-v0.2",
   "description": "Delegation conformance vectors (MMF section 6). The parent is issued at t=0. Steps run in order: 'delegate' creates a named child at t=1000 from 'from' (default parent) and expects 'valid' or 'invalid'; 'tx' evaluates a transaction as a named mandate (the gate evaluates the full chain); 'revoke' sets the local revoked flag on a named mandate.",
   "vectors": [
-    {"id": "D01", "desc": "stricter child valid and usable",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 100, "currency": "GBP", "allowed_payees": ["tesco.com"], "expires_in_days": 7, "velocity_limit": 2, "total_budget": 200, "budget_window_days": 30}, "expect": "valid"}, {"tx": {"as": "c", "payee": "tesco.com", "amount": 50, "currency": "GBP", "at": 2000}, "expect": {"allowed": true, "check": "WITHIN"}}]},
-    {"id": "D02", "desc": "equal bounds are a valid (non-strict) subset",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "valid"}]},
-    {"id": "D03", "desc": "wider amount cap",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 501, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D04", "desc": "different currency",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "USD", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D05", "desc": "payee outside parent allowlist",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "evil.io"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D06", "desc": "empty payee list (= any payee) under restricted parent",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": [], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D07", "desc": "velocity 0 (= unlimited) under limited parent",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 0, "total_budget": 1000, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D08", "desc": "higher velocity",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 6, "total_budget": 1000, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D09", "desc": "null budget (= unlimited) under budgeted parent",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": null, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D10", "desc": "higher budget",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1001, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D11", "desc": "longer expiry window",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 31, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D12", "desc": "cannot delegate from a revoked parent",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"revoke": "parent"}, {"delegate": "c", "bounds": {"max_amount": 10, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "invalid"}]},
-    {"id": "D13", "desc": "parent revoked after delegation stops the child",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 100, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "valid"}, {"revoke": "parent"}, {"tx": {"as": "c", "payee": "tesco.com", "amount": 10, "at": 2000}, "expect": {"allowed": false, "check": "REVOKED"}}]},
-    {"id": "D14", "desc": "parent expiry bounds the child even if the child window is later",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 100, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "valid"}, {"tx": {"as": "c", "payee": "tesco.com", "amount": 10, "at": 2592001}, "expect": {"allowed": false, "check": "EXPIRED"}}]},
-    {"id": "D15", "desc": "sibling spend aggregates against the parent budget",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 100, "budget_window_days": 30},
-     "steps": [{"delegate": "c1", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 100, "budget_window_days": 30}, "expect": "valid"}, {"delegate": "c2", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 100, "budget_window_days": 30}, "expect": "valid"}, {"tx": {"as": "c1", "payee": "tesco.com", "amount": 80, "at": 2000}, "expect": {"allowed": true, "check": "WITHIN"}}, {"tx": {"as": "c2", "payee": "tesco.com", "amount": 30, "at": 2001}, "expect": {"allowed": false, "check": "BUDGET"}}]},
-    {"id": "D16", "desc": "child spend counts against parent velocity",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 1, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 1, "total_budget": 1000, "budget_window_days": 30}, "expect": "valid"}, {"tx": {"as": "c", "payee": "tesco.com", "amount": 10, "at": 2000}, "expect": {"allowed": true, "check": "WITHIN"}}, {"tx": {"as": "parent", "payee": "tesco.com", "amount": 10, "at": 2001}, "expect": {"allowed": false, "check": "VELOCITY"}}]},
-    {"id": "D17", "desc": "grandchild chain - root revocation stops the leaf",
-     "parent": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30},
-     "steps": [{"delegate": "c", "bounds": {"max_amount": 100, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "valid"}, {"delegate": "g", "from": "c", "bounds": {"max_amount": 50, "currency": "GBP", "allowed_payees": ["tesco.com", "sky.com"], "expires_in_days": 30, "velocity_limit": 5, "total_budget": 1000, "budget_window_days": 30}, "expect": "valid"}, {"revoke": "parent"}, {"tx": {"as": "g", "payee": "tesco.com", "amount": 10, "at": 2000}, "expect": {"allowed": false, "check": "REVOKED"}}]}
+    {
+      "id": "D01",
+      "desc": "stricter child valid and usable",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 100,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com"
+            ],
+            "expires_in_days": 7,
+            "velocity_limit": 2,
+            "total_budget": 200,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 50,
+            "currency": "GBP",
+            "at": 2000
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "D02",
+      "desc": "equal bounds are a valid (non-strict) subset",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        }
+      ]
+    },
+    {
+      "id": "D03",
+      "desc": "wider amount cap",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 501,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D04",
+      "desc": "different currency",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "USD",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D05",
+      "desc": "payee outside parent allowlist",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "evil.io"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D06",
+      "desc": "empty payee list (= any payee) under restricted parent",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D07",
+      "desc": "velocity 0 (= unlimited) under limited parent",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 0,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D08",
+      "desc": "higher velocity",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 6,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D09",
+      "desc": "null budget (= unlimited) under budgeted parent",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": null,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D10",
+      "desc": "higher budget",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1001,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D11",
+      "desc": "longer expiry window",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 31,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D12",
+      "desc": "cannot delegate from a revoked parent",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "revoke": "parent"
+        },
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 10,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "D13",
+      "desc": "parent revoked after delegation stops the child",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 100,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        },
+        {
+          "revoke": "parent"
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 10,
+            "at": 2000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "REVOKED"
+          }
+        }
+      ]
+    },
+    {
+      "id": "D14",
+      "desc": "parent expiry bounds the child even if the child window is later",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 100,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 10,
+            "at": 2592001,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "EXPIRED"
+          }
+        }
+      ]
+    },
+    {
+      "id": "D15",
+      "desc": "sibling spend aggregates against the parent budget",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 100,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c1",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 100,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        },
+        {
+          "delegate": "c2",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 100,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        },
+        {
+          "tx": {
+            "as": "c1",
+            "payee": "tesco.com",
+            "amount": 80,
+            "at": 2000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "tx": {
+            "as": "c2",
+            "payee": "tesco.com",
+            "amount": 30,
+            "at": 2001,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "BUDGET"
+          }
+        }
+      ]
+    },
+    {
+      "id": "D16",
+      "desc": "child spend counts against parent velocity",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 1,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 500,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 1,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 10,
+            "at": 2000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "tx": {
+            "as": "parent",
+            "payee": "tesco.com",
+            "amount": 10,
+            "at": 2001,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "VELOCITY"
+          }
+        }
+      ]
+    },
+    {
+      "id": "D17",
+      "desc": "grandchild chain - root revocation stops the leaf",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com",
+          "sky.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 5,
+        "total_budget": 1000,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 100,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        },
+        {
+          "delegate": "g",
+          "from": "c",
+          "bounds": {
+            "max_amount": 50,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com",
+              "sky.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 5,
+            "total_budget": 1000,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        },
+        {
+          "revoke": "parent"
+        },
+        {
+          "tx": {
+            "as": "g",
+            "payee": "tesco.com",
+            "amount": 10,
+            "at": 2000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "REVOKED"
+          }
+        }
+      ]
+    }
   ]
 }

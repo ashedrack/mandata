@@ -5,7 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.1] — implements MMF-v0.3.1
+
+Correctness release addressing review findings on the 0.4.0 security semantics.
+Conformance vectors: 64 (30 core + 17 delegation + 15 lifecycle + 2 evidence-hash).
+
+### Security
+- **Transaction currency is mandatory.** An integer amount without a currency is not
+  financially meaningful; `enforce()` now denies an omitted `currency` with `CURRENCY`
+  instead of silently interpreting it in the mandate's currency.
+- **Single-dispatch settlement.** `enforce()` alone could not stop two concurrent
+  dispatcher workers from both observing AUTHORIZED and submitting to the rail. New
+  `claim(mandate, tx_id, payee, amount, currency)` atomically verifies the instruction
+  binds to the stored request and takes the one dispatch slot (AUTHORIZED → CLAIMED);
+  `unclaim()` is the fail-safe operator-recovery reverse. `settle`/`void` accept
+  AUTHORIZED and CLAIMED transactions. Lifecycle vectors L11–L15.
+- **Atomic durable evidence.** `EvidenceLog(store=SQLiteStore)` writes the evidence
+  record inside the same `BEGIN IMMEDIATE` transaction as the ledger and reservation
+  update: a failed append rolls the decision back, so a decided `tx_id` can never be
+  left without its mandatory evidence record.
+- **Chain resolution is explicit.** An unresolvable, cyclic or malformed parent chain
+  now denies with `INVALID_CHAIN` (distinct from `REVOKED`), evaluated during chain
+  resolution before the ledger — including on replay, so a malformed chain cannot
+  poison a `tx_id`.
+- **Credentials verified chain-wide, unconditionally.** A credential-bound gate now
+  requires a valid credential for *every* chain member; a delegate without its own
+  credential denies with `CREDENTIAL`.
+- **Canonical serialization is byte-level.** Evidence payloads reject `|` (and must
+  be UTF-8) so no record can be serialized ambiguously.
+
+### Changed
+- AP2 adapter requires a real `tx_id` on the cart (no more random fallback, which
+  silently broke idempotency).
+- LangChain `guard()` fills the mandate's currency when the tool takes no currency
+  argument, and accepts `settle_on_success=True` to complete the lifecycle after the
+  tool runs (settle on success, void on exception).
+- `money.exponent()` rejects non-string currency cleanly.
+
+### Breaking
+- `enforce()` requires `currency`; a `claim()` step sits between AUTHORIZED and
+  settlement dispatch; evidence chains from 0.4.0 remain valid (the canonical form
+  is unchanged).
 
 ## [0.4.0] — implements MMF-v0.3
 

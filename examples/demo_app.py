@@ -31,8 +31,10 @@ from mandata import (
     Bounds,
     EvidenceLog,
     HTTPRegistry,
+    LifecycleError,
     Mandate,
     SQLiteStore,
+    claim,
     delegate,
     enforce,
     from_minor,
@@ -143,7 +145,11 @@ def main():
             hooks=[metrics_hook],
             tx_id=tx_id,
         )
-        if d.binds(payee, amount, "GBP"):
+        if d.allowed:
+            try:
+                claim(m, tx_id, payee, amount, "GBP", evidence_log=log, store=store)
+            except LifecycleError:
+                return d, None  # already claimed or does not bind — never dispatched
             r = post(
                 "http://127.0.0.1:8391/pay", {"tx_id": tx_id, "payee": payee, "amount": amount}
             )
@@ -207,7 +213,13 @@ def main():
         hooks=[metrics_hook],
     )
     if d.allowed:
-        x402.bind_payment(d, {"payload": {"authorization": {"to": "tesco.com", "value": "2500"}}})
+        x402.bind_payment(
+            d,
+            {"payload": {"authorization": {"to": "tesco.com", "value": "2500"}}},
+            mandate=mandate,
+            evidence_log=log,
+            store=store,
+        )
         r = post(
             "http://127.0.0.1:8391/pay", {"tx_id": d.tx_id, "payee": d.payee, "amount": d.amount}
         )

@@ -19,7 +19,7 @@ from contextlib import ExitStack, contextmanager
 from .evidence import EvidenceLog
 from .models import Decision, Mandate, _is_finite_number
 from .money import is_minor_amount
-from .state import AUTHORIZED, DENIED, SETTLED, VOIDED, TxRecord
+from .state import AUTHORIZED, CLAIMED, DENIED, SETTLED, VOIDED, TxRecord
 
 _DEFAULT_LOG = EvidenceLog()
 
@@ -70,7 +70,7 @@ def enforce(
         raise ValueError(f"evaluation time must be a finite number, got {at!r}")
     log = evidence_log or _DEFAULT_LOG
     tx_id = tx_id or uuid.uuid4().hex
-    chain = mandate.chain()
+    chain, chain_error = mandate.resolve_chain()
     ledger = store or mandate._state
     stored_amount = amount if is_minor_amount(amount) else None
 
@@ -85,6 +85,21 @@ def enforce(
         elif prior is not None:
             check, allowed, status, event = "TX_CONFLICT", False, DENIED, "DECISION"
             detail = f"tx_id {tx_id} was already used for a different request"
+        elif chain_error is not None:
+            check, allowed, status, event = "INVALID_CHAIN", False, DENIED, "DECISION"
+            detail = chain_error
+            ledger.put_tx(
+                TxRecord(
+                    tx_id,
+                    mandate.mandate_id,
+                    payee,
+                    stored_amount,
+                    currency,
+                    allowed,
+                    check,
+                    status,
+                )
+            )
         else:
             check, detail = _evaluate(
                 mandate,
@@ -145,6 +160,114 @@ def enforce(
     return decision
 
 
+def claim(
+    mandate: Mandate,
+    tx_id: str,
+    payee: str,
+    amount: int,
+    currency: str | None = None,
+    evidence_log: EvidenceLog | None = None,
+    store=None,
+    at: float | None = None,
+    clock: Callable[[], float] = time.time,
+) -> TxRecord:
+    """Atomically claim an AUTHORIZED transaction for dispatch (MMF §5.5).
+
+    Exactly one worker can move a transaction from AUTHORIZED to CLAIMED:
+    the transition verifies that the instruction about to be submitted
+    matches the stored request (payee, amount, currency), then claims it in
+    the same serialized step. Concurrent dispatchers cannot both succeed —
+    the loser raises ``LifecycleError`` and MUST NOT submit. After a
+    successful claim, invoke the rail idempotently on ``tx_id``, then call
+    ``settle()`` or ``void()`` with its outcome.
+
+    This is the settlement-half of idempotency: ``enforce()`` guarantees a
+    request is not authorized twice; ``claim()`` guarantees an authorization
+    is not dispatched twice.
+
+    Raises LifecycleError for unknown, denied, already claimed, settled or
+    voided transactions, or when the instruction does not match the stored
+    request.
+    """
+    at = clock() if at is None else at
+    log = evidence_log or _DEFAULT_LOG
+    chain, chain_error = mandate.resolve_chain()
+    if chain_error is not None:
+        raise LifecycleError(chain_error)
+    ledger = store or mandate._state
+    with _serialized(chain, store):
+        tx = ledger.get_tx(tx_id)
+        if tx is None or tx.mandate_id != mandate.mandate_id:
+            raise LifecycleError(f"unknown transaction {tx_id} for mandate {mandate.mandate_id}")
+        if tx.status != AUTHORIZED:
+            raise LifecycleError(f"cannot claim {tx_id}: status is {tx.status}, not AUTHORIZED")
+        if (tx.payee, tx.amount, tx.currency) != (payee, amount, currency):
+            raise LifecycleError(
+                f"instruction ({payee!r}, {amount!r}, {currency!r}) does not bind to "
+                f"authorized transaction {tx_id} ({tx.payee!r}, {tx.amount!r}, {tx.currency!r})"
+            )
+        tx = dataclasses.replace(tx, status=CLAIMED)
+        ledger.put_tx(tx)
+        log.append(
+            mandate_id=mandate.mandate_id,
+            agent=mandate.agent,
+            payee=tx.payee,
+            amount=tx.amount,
+            allowed=True,
+            check=tx.check,
+            timestamp=at,
+            detail=f"{tx_id} claimed for dispatch",
+            tx_id=tx_id,
+            event="CLAIM",
+        )
+    return tx
+
+
+def unclaim(
+    mandate: Mandate,
+    tx_id: str,
+    evidence_log: EvidenceLog | None = None,
+    store=None,
+    at: float | None = None,
+    clock: Callable[[], float] = time.time,
+) -> TxRecord:
+    """Release a CLAIMED transaction back to AUTHORIZED (operator recovery).
+
+    Use only when it is certain the rail was never invoked; if the rail
+    outcome is unknown, the transaction MUST stay CLAIMED (fail-safe: an
+    unreleased reservation costs budget, a double-dispatch costs money).
+    """
+    at = clock() if at is None else at
+    log = evidence_log or _DEFAULT_LOG
+    chain, chain_error = mandate.resolve_chain()
+    if chain_error is not None:
+        raise LifecycleError(chain_error)
+    ledger = store or mandate._state
+    with _serialized(chain, store):
+        tx = ledger.get_tx(tx_id)
+        if tx is None or tx.mandate_id != mandate.mandate_id:
+            raise LifecycleError(f"unknown transaction {tx_id} for mandate {mandate.mandate_id}")
+        if tx.status == AUTHORIZED:
+            return tx
+        if tx.status != CLAIMED:
+            raise LifecycleError(f"cannot unclaim {tx_id}: status is {tx.status}")
+        tx = dataclasses.replace(tx, status=AUTHORIZED)
+        ledger.put_tx(tx)
+        log.append(
+            mandate_id=mandate.mandate_id,
+            agent=mandate.agent,
+            payee=tx.payee,
+            amount=tx.amount,
+            allowed=True,
+            check=tx.check,
+            timestamp=at,
+            detail=f"{tx_id} released before dispatch",
+            tx_id=tx_id,
+            event="UNCLAIM",
+        )
+    return tx
+
+
 def settle(
     mandate: Mandate,
     tx_id: str,
@@ -153,7 +276,7 @@ def settle(
     at: float | None = None,
     clock: Callable[[], float] = time.time,
 ) -> TxRecord:
-    """Mark an AUTHORIZED transaction as SETTLED (funds moved on the rail).
+    """Mark an AUTHORIZED or CLAIMED transaction as SETTLED (funds moved).
 
     Idempotent: settling an already-settled transaction returns it unchanged.
     Raises LifecycleError for unknown, denied or voided transactions.
@@ -169,7 +292,7 @@ def void(
     at: float | None = None,
     clock: Callable[[], float] = time.time,
 ) -> TxRecord:
-    """Release an AUTHORIZED transaction that will never settle.
+    """Release an AUTHORIZED or CLAIMED transaction that will never settle.
 
     Its reserved amount and velocity slot are returned to every mandate in
     the chain. Idempotent for already-voided transactions. A SETTLED
@@ -181,7 +304,9 @@ def void(
 def _transition(mandate, tx_id, target, evidence_log, store, at, clock) -> TxRecord:
     at = clock() if at is None else at
     log = evidence_log or _DEFAULT_LOG
-    chain = mandate.chain()
+    chain, chain_error = mandate.resolve_chain()
+    if chain_error is not None:
+        raise LifecycleError(chain_error)
     ledger = store or mandate._state
     with _serialized(chain, store):
         tx = ledger.get_tx(tx_id)
@@ -189,7 +314,7 @@ def _transition(mandate, tx_id, target, evidence_log, store, at, clock) -> TxRec
             raise LifecycleError(f"unknown transaction {tx_id} for mandate {mandate.mandate_id}")
         if tx.status == target:
             return tx
-        if tx.status != AUTHORIZED:
+        if tx.status not in (AUTHORIZED, CLAIMED):
             raise LifecycleError(f"cannot move {tx_id} from {tx.status} to {target}")
         if target == VOIDED:
             for node in chain:
@@ -244,9 +369,14 @@ def _evaluate(mandate, chain, payee, amount, currency, at, store, registry, cred
             return "CREDENTIAL", "credential and principal_key must both be supplied"
         from .credentials import verify_credential
 
-        ok, why = verify_credential(credential, mandate, key, at=at)
-        if not ok:
-            return "CREDENTIAL", why
+        creds = credential if isinstance(credential, dict) else {mandate.mandate_id: credential}
+        for node in chain:
+            node_credential = creds.get(node.mandate_id)
+            if node_credential is None:
+                return "CREDENTIAL", f"no credential supplied for {_label(node, mandate)}"
+            ok, why = verify_credential(node_credential, node, key, at=at)
+            if not ok:
+                return "CREDENTIAL", f"{_label(node, mandate)}: {why}"
 
     if registry is not None:
         for node in chain:
@@ -263,8 +393,6 @@ def _evaluate(mandate, chain, payee, amount, currency, at, store, registry, cred
     for node in chain:
         if node.revoked:
             return "REVOKED", f"{_label(node, mandate)} revoked"
-        if node.parent_mandate_id and node._parent is None:
-            return "REVOKED", f"parent mandate {node.parent_mandate_id} unresolvable"
 
     for node in chain:
         if node.is_expired(at):
@@ -277,10 +405,14 @@ def _evaluate(mandate, chain, payee, amount, currency, at, store, registry, cred
         if amount > node.bounds.max_amount:
             return "CAP_EXCEEDED", f"amount {amount} exceeds cap {node.bounds.max_amount}"
 
-    if currency:
-        for node in chain:
-            if currency != node.bounds.currency:
-                return "CURRENCY", f"currency {currency} outside mandate ({node.bounds.currency})"
+    for node in chain:
+        if currency != node.bounds.currency:
+            return (
+                "CURRENCY",
+                f"currency {currency!r} outside mandate ({node.bounds.currency})"
+                if currency
+                else "transaction currency is required",
+            )
 
     for node in chain:
         if node.bounds.allowed_payees and payee not in node.bounds.allowed_payees:

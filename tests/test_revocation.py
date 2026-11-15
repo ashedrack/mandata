@@ -5,7 +5,7 @@ def test_registry_revocation_rejects():
     reg = InMemoryRegistry()
     m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100))
     reg.revoke(m.mandate_id)
-    d = enforce(m, "store.example", 10, evidence_log=EvidenceLog(), registry=reg)
+    d = enforce(m, "store.example", 10, evidence_log=EvidenceLog(), registry=reg, currency="GBP")
     assert not d.allowed and "registry" in d.reason
 
 
@@ -16,8 +16,8 @@ def test_revocation_affects_all_processes_sharing_registry():
     m1.mandate_id = m2.mandate_id = "shared-id"
     reg.revoke("shared-id")
     log = EvidenceLog()
-    assert not enforce(m1, "x", 1, evidence_log=log, registry=reg).allowed
-    assert not enforce(m2, "x", 1, evidence_log=log, registry=reg).allowed
+    assert not enforce(m1, "x", 1, evidence_log=log, registry=reg, currency="GBP").allowed
+    assert not enforce(m2, "x", 1, evidence_log=log, registry=reg, currency="GBP").allowed
 
 
 def test_restore_reenables():
@@ -25,4 +25,4 @@ def test_restore_reenables():
     m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100))
     reg.revoke(m.mandate_id)
     reg.restore(m.mandate_id)
-    assert enforce(m, "x", 10, evidence_log=EvidenceLog(), registry=reg).allowed
+    assert enforce(m, "x", 10, evidence_log=EvidenceLog(), registry=reg, currency="GBP").allowed

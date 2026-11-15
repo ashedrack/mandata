@@ -58,6 +58,7 @@ def guard(
     registry=None,
     hooks=(),
     raise_on_deny: bool = False,
+    settle_on_success: bool = False,
 ) -> Callable:
     """Wrap ``fn`` so every call is gated by ``enforce(mandate, ...)``.
 
@@ -70,6 +71,11 @@ def guard(
         evidence_log, store, registry, hooks: passed through to enforce()
         raise_on_deny: if True, raise PermissionError on denial instead of
             returning a dict (useful outside agent loops)
+        settle_on_success: if True, complete the lifecycle around the tool
+            call: ``claim()`` the authorization for dispatch, ``void()`` it if
+            ``fn`` raises, ``settle()`` it if ``fn`` returns. Otherwise
+            authorizations stay reserved and the caller must complete the
+            lifecycle itself.
 
     Returns:
         A callable with the same signature; returns ``fn(...)`` on allow or a
@@ -91,7 +97,9 @@ def guard(
             mandate,
             payee=str(payee),
             amount=_to_gate_amount(amount, currency or mandate.bounds.currency, amount_unit),
-            currency=currency,
+            # A tool with no currency arg transacts in the mandate's own
+            # currency — the only value the gate would accept anyway.
+            currency=str(currency) if currency is not None else mandate.bounds.currency,
             evidence_log=evidence_log,
             store=store,
             registry=registry,
@@ -107,7 +115,31 @@ def guard(
                 "allowed": False,
                 "payee": str(payee),
             }
-        return fn(*args, **kwargs)
+        if not settle_on_success:
+            return fn(*args, **kwargs)
+        from ..enforce import LifecycleError, claim, settle, void
+
+        gate_amount = _to_gate_amount(amount, currency or mandate.bounds.currency, amount_unit)
+        gate_currency = str(currency) if currency is not None else mandate.bounds.currency
+        try:
+            claim(
+                mandate,
+                decision.tx_id,
+                str(payee),
+                gate_amount,
+                gate_currency,
+                evidence_log=evidence_log,
+                store=store,
+            )
+        except LifecycleError as exc:
+            raise PermissionError(f"mandate dispatch rejected: {exc}") from exc
+        try:
+            result = fn(*args, **kwargs)
+        except Exception:
+            void(mandate, decision.tx_id, evidence_log=evidence_log, store=store)
+            raise
+        settle(mandate, decision.tx_id, evidence_log=evidence_log, store=store)
+        return result
 
     wrapper.__name__ = getattr(fn, "__name__", "guarded_tool")
     wrapper.__doc__ = f"[mandate-gated] {getattr(fn, '__doc__', '') or ''}"

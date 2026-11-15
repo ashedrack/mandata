@@ -26,7 +26,7 @@ pip install mandata
 ```
 
 ```python
-from mandata import Mandate, Bounds, enforce, settle, to_minor
+from mandata import Mandate, Bounds, enforce, claim, settle, to_minor
 
 # A principal grants a bounded mandate to an agent (amounts in minor units)
 mandate = Mandate(
@@ -43,14 +43,15 @@ mandate = Mandate(
 
 # At transaction time: deterministic enforcement BEFORE settlement.
 # tx_id makes retries idempotent and links the authorization to settlement.
-decision = enforce(mandate, payee="store.example", amount=4999, tx_id="order-1")
+decision = enforce(mandate, payee="store.example", amount=4999, currency="GBP", tx_id="order-1")
 assert decision.allowed  # → True (status AUTHORIZED, amount reserved)
 print(decision.check)  # → "WITHIN" (normative MMF check ID)
 
-# Submit to the rail only an instruction that binds to the approval, then settle
-if decision.binds("store.example", 4999):
-    ...  # rail.pay(..., idempotency_key="order-1")
-    settle(mandate, "order-1")  # or void(mandate, "order-1") if it failed
+# Claim takes the single dispatch slot and verifies the rail instruction binds
+# to the approval — only then submit, and only once.
+claim(mandate, "order-1", "store.example", 4999, "GBP")
+...  # rail.pay(..., idempotency_key="order-1")
+settle(mandate, "order-1")  # or void(mandate, "order-1") if it failed
 ```
 
 ## Architecture
@@ -78,7 +79,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [x] Multi-hop delegation (agent → sub-agent mandate weakening)
 - [x] **v0.3** — [MMF-v0.2](spec/mmf-v0.2.md): credential-bound gate, chain-wide delegation enforcement, fail-closed registry, canonical evidence hashing, 43 conformance vectors
 - [x] **v0.4** — [MMF-v0.3](spec/mmf-v0.3.md): integer minor-unit amounts, `tx_id` idempotency, authorize/settle/void lifecycle, payee binding in adapters, gate-signed evidence, cross-process serializable SQLite store, 58 conformance vectors
-- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3 conformant)
+- [x] **v0.4.1** — [MMF-v0.3.1](spec/mmf-v0.3.1.md): mandatory transaction currency, `INVALID_CHAIN` for unresolvable/cyclic chains, chain-wide credential verification, `claim()`/`unclaim()` single-dispatch lifecycle (AUTHORIZED→CLAIMED→SETTLED), atomic durable evidence in the state transaction, byte-level canonical serialization, 64 conformance vectors
+- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.1 conformant)
 
 ## Research
 
