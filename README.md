@@ -81,7 +81,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [x] **v0.4** — [MMF-v0.3](spec/mmf-v0.3.md): integer minor-unit amounts, `tx_id` idempotency, authorize/settle/void lifecycle, payee binding in adapters, gate-signed evidence, cross-process serializable SQLite store, 58 conformance vectors
 - [x] **v0.4.1** — [MMF-v0.3.1](spec/mmf-v0.3.1.md): mandatory transaction currency, `INVALID_CHAIN` for unresolvable/cyclic chains, chain-wide credential verification, `claim()`/`unclaim()` single-dispatch lifecycle (AUTHORIZED→CLAIMED→SETTLED), atomic durable evidence in the state transaction, byte-level canonical serialization, 64 conformance vectors
 - [x] **v0.4.2** — [MMF-v0.3.2](spec/mmf-v0.3.2.md): permanently-consumed claim slot (no re-claim; recovery = void + new tx_id), `REJECTED` evidence for failed lifecycle transitions, velocity counts issued authorizations (void refunds budget only), budget-window attenuation, canonical evidence v2 (currency + status hashed, NFC), 65 conformance vectors
-- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.2 conformant)
+- [x] **v0.4.3** — [MMF-v0.3.3](spec/mmf-v0.3.3.md): `void` of a CLAIMED transaction requires `confirmed_rail_cancelled` (uncertain in-flight stays CLAIMED), serialized ledger-first ordering + `TX_CONFLICT` evidence-only rule, mediation-scoped claim guarantee, REJECTED records carry the attempted instruction, byte-level timestamp rule, per-gate evidence chain scope — 66 vectors
+- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.3 conformant)
 
 ## Research
 

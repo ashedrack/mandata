@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.3] — implements MMF-v0.3.3
+
+- **`void` on a CLAIMED transaction requires `confirmed_rail_cancelled=True`** — an uncertain in-flight outcome stays CLAIMED; releasing budget on an unconfirmed void could let spend escape the budget. AUTHORIZED → VOIDED is unchanged.
+- **Normative ledger ordering** — the serialized `tx_id` lookup is specified as the first step inside serialization; `TX_CONFLICT` is evidence-only and MUST NOT modify the stored ledger entry (matches prior behavior).
+- **Mediation-scoped claim guarantee** — "at most one successful claim per `tx_id` within a correctly mediated deployment"; rail-bypass is a deployment concern.
+- **REJECTED records carry the attempted instruction** (submitted payee/amount/currency), specified.
+- **Byte-level timestamp rule** — Unix epoch seconds, shortest round-trip decimal, specified; evidence chain scope = per evidence log/gate, genesis = 64 ASCII `0`s.
+- **LangChain `guard(settle_on_success=True)`** — a tool exception now leaves the transaction CLAIMED (uncertain outcome) rather than auto-voiding; reconcile via `settle()` or `void(confirmed_rail_cancelled=True)`.
+- 66 conformance vectors (L16: unconfirmed void of a claimed transaction rejected); 194 tests.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

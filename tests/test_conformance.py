@@ -162,7 +162,13 @@ def test_lifecycle_vector(v):
             elif "settle" in step:
                 tx = settle(m, step["settle"], evidence_log=log, at=step["at"])
             else:
-                tx = void(m, step["void"], evidence_log=log, at=step["at"])
+                tx = void(
+                    m,
+                    step["void"],
+                    evidence_log=log,
+                    at=step["at"],
+                    confirmed_rail_cancelled=step.get("confirmed_rail_cancelled", False),
+                )
         except LifecycleError:
             assert expect.get("error"), f"{v['id']}: unexpected rejection"
             # rejected transitions append exactly one REJECTED evidence record
