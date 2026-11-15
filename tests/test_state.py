@@ -11,9 +11,9 @@ def test_cumulative_budget_allows_then_rejects():
         bounds=Bounds(max_amount=1000, total_budget=100, budget_window_days=30),
     )
     log = EvidenceLog()
-    assert enforce(m, "store.example", 60, evidence_log=log).allowed
-    assert not enforce(m, "store.example", 50, evidence_log=log).allowed
-    assert enforce(m, "store.example", 40, evidence_log=log).allowed
+    assert enforce(m, "store.example", 60, evidence_log=log, currency="GBP").allowed
+    assert not enforce(m, "store.example", 50, evidence_log=log, currency="GBP").allowed
+    assert enforce(m, "store.example", 40, evidence_log=log, currency="GBP").allowed
 
 
 def test_budget_respects_window():
@@ -24,7 +24,7 @@ def test_budget_respects_window():
     )
     past = time.time() - 31 * 86400
     m.record(past, 90)
-    assert enforce(m, "store.example", 80, evidence_log=EvidenceLog()).allowed
+    assert enforce(m, "store.example", 80, evidence_log=EvidenceLog(), currency="GBP").allowed
 
 
 def test_sqlite_store_persists_across_instances(tmp_path):
@@ -44,6 +44,8 @@ def test_enforce_uses_shared_store():
     m2 = Mandate(principal="u", agent="a2", bounds=Bounds(max_amount=100, velocity_limit=2))
     m2.mandate_id = "shared"
     log = EvidenceLog()
-    assert enforce(m1, "store.example", 10, evidence_log=log, store=store).allowed
-    assert enforce(m2, "store.example", 10, evidence_log=log, store=store).allowed
-    assert not enforce(m1, "store.example", 10, evidence_log=log, store=store).allowed
+    assert enforce(m1, "store.example", 10, evidence_log=log, store=store, currency="GBP").allowed
+    assert enforce(m2, "store.example", 10, evidence_log=log, store=store, currency="GBP").allowed
+    assert not enforce(
+        m1, "store.example", 10, evidence_log=log, store=store, currency="GBP"
+    ).allowed

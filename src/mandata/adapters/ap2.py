@@ -13,7 +13,7 @@ authorization signature is the AP2 layer's responsibility.
 
 from __future__ import annotations
 
-from ..enforce import enforce
+from ..enforce import LifecycleError, claim, enforce
 from ..models import Bounds, Decision, Mandate
 from ..money import to_minor
 from .x402 import PayeeBindingError
@@ -68,23 +68,37 @@ def enforce_cart(mandate: Mandate, cart: dict, tx_id: str | None = None, **kwarg
     """Gate an AP2 CartMandate using the merchant and total it states.
 
     ``tx_id`` defaults to the cart id (``contents.id``), the natural
-    idempotency key for an AP2 checkout.
+    idempotency key for an AP2 checkout. A stable ``tx_id`` is required
+    (MMF §3): without one, retries cannot be recognized.
     """
     payee, amount, currency = _cart_terms(cart)
     contents = cart.get("contents") or cart
+    key = tx_id or contents.get("id")
+    if not key:
+        raise ValueError("enforce_cart requires a tx_id (pass tx_id= or a cart with contents.id)")
     return enforce(
         mandate,
         payee=payee,
         amount=amount,
         currency=currency,
-        tx_id=tx_id or contents.get("id"),
+        tx_id=key,
         **kwargs,
     )
 
 
-def bind_payment_mandate(decision: Decision, payment_mandate: dict) -> None:
+def bind_payment_mandate(
+    decision: Decision,
+    payment_mandate: dict,
+    mandate: Mandate | None = None,
+    **claim_kwargs,
+) -> None:
     """Raise PayeeBindingError unless the PaymentMandate pays exactly what the
-    gate approved (``payment_details_total`` and ``merchant_agent``)."""
+    gate approved (``payment_details_total`` and ``merchant_agent``).
+
+    When ``mandate`` is given, the authorization is also *claimed* for
+    dispatch (MMF §5.4): the instruction binds and the single dispatch slot is
+    taken atomically, so two workers can never both release the payment.
+    """
     contents = payment_mandate.get("payment_mandate_contents") or payment_mandate
     total = (contents.get("payment_details_total") or {}).get("amount") or {}
     currency = str(total.get("currency") or "USD").upper()
@@ -95,3 +109,8 @@ def bind_payment_mandate(decision: Decision, payment_mandate: dict) -> None:
             f"payment mandate to {payee!r} for {amount!r} {currency} does not bind to "
             f"approved decision {decision.tx_id} ({decision.payee!r}, {decision.amount!r})"
         )
+    if mandate is not None:
+        try:
+            claim(mandate, decision.tx_id, payee, amount, currency, **claim_kwargs)
+        except LifecycleError as exc:
+            raise PayeeBindingError(str(exc)) from exc

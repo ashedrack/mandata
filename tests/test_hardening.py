@@ -25,7 +25,7 @@ def mk(**kw) -> Mandate:
 def test_non_finite_or_non_numeric_amount_denied(amount):
     """Only positive integers in minor units pass: floats (even 10.0) never do."""
     log = EvidenceLog()
-    d = enforce(mk(total_budget=50), "x", amount, evidence_log=log)
+    d = enforce(mk(total_budget=50), "x", amount, evidence_log=log, currency="GBP")
     assert not d.allowed and d.check == "NON_POSITIVE"
     assert log.verify_chain()
 
@@ -55,7 +55,7 @@ def test_unreachable_registry_denies_and_records_evidence():
             raise ConnectionError("timeout")
 
     log = EvidenceLog()
-    d = enforce(mk(), "x", 10, evidence_log=log, registry=Down())
+    d = enforce(mk(), "x", 10, evidence_log=log, registry=Down(), currency="GBP")
     assert not d.allowed and d.check == "REVOKED_REGISTRY"
     assert "unavailable" in d.reason
     assert len(log.records) == 1 and log.records[0].check == "REVOKED_REGISTRY"
@@ -63,14 +63,14 @@ def test_unreachable_registry_denies_and_records_evidence():
 
 def test_at_zero_is_honoured_not_replaced_by_wall_clock():
     m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100), issued_at=0)
-    d = enforce(m, "x", 1, at=0, evidence_log=EvidenceLog())
+    d = enforce(m, "x", 1, at=0, evidence_log=EvidenceLog(), currency="GBP")
     assert d.allowed and d.evidence.timestamp == 0
 
 
 def test_gate_clock_is_authoritative_when_at_omitted():
     m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100, expires_in_days=1))
     future = m.expires_at + 1
-    d = enforce(m, "x", 1, evidence_log=EvidenceLog(), clock=lambda: future)
+    d = enforce(m, "x", 1, evidence_log=EvidenceLog(), clock=lambda: future, currency="GBP")
     assert d.check == "EXPIRED"
 
 
@@ -78,7 +78,7 @@ def test_gate_clock_is_authoritative_when_at_omitted():
 
 
 def test_decision_and_evidence_carry_check_id():
-    d = enforce(mk(), "x", 500, evidence_log=EvidenceLog())
+    d = enforce(mk(), "x", 500, evidence_log=EvidenceLog(), currency="GBP")
     assert d.check == "CAP_EXCEEDED" and d.evidence.check == "CAP_EXCEEDED"
     assert "exceeds cap" in d.reason  # advisory text still available
 
@@ -140,11 +140,13 @@ def test_gate_verifies_credential_first():
     m = mk()
     cred = issue_credential(m, key)
     assert enforce(
-        m, "x", 10, evidence_log=EvidenceLog(), credential=cred, principal_key=pub
+        m, "x", 10, evidence_log=EvidenceLog(), credential=cred, principal_key=pub, currency="GBP"
     ).allowed
 
     other = SigningKey.generate().verify_key.encode().hex()
-    d = enforce(m, "x", 10, evidence_log=EvidenceLog(), credential=cred, principal_key=other)
+    d = enforce(
+        m, "x", 10, evidence_log=EvidenceLog(), credential=cred, principal_key=other, currency="GBP"
+    )
     assert d.check == "CREDENTIAL"
 
 
@@ -160,12 +162,13 @@ def test_credential_check_precedes_revocation():
         evidence_log=EvidenceLog(),
         credential=cred,
         principal_key=SigningKey.generate().verify_key.encode().hex(),
+        currency="GBP",
     )
     assert d.check == "CREDENTIAL"
 
 
 def test_half_supplied_credential_binding_denied():
-    d = enforce(mk(), "x", 10, evidence_log=EvidenceLog(), principal_key="ab" * 32)
+    d = enforce(mk(), "x", 10, evidence_log=EvidenceLog(), principal_key="ab" * 32, currency="GBP")
     assert d.check == "CREDENTIAL"
 
 
@@ -194,14 +197,16 @@ def test_registry_revocation_of_parent_stops_child():
     parent = mk()
     child = delegate(parent, "sub", Bounds(max_amount=50))
     reg.revoke(parent.mandate_id)
-    d = enforce(child, "x", 10, evidence_log=EvidenceLog(), registry=reg)
+    d = enforce(child, "x", 10, evidence_log=EvidenceLog(), registry=reg, currency="GBP")
     assert d.check == "REVOKED_REGISTRY" and "ancestor" in d.reason
 
 
 def test_unresolvable_parent_denied():
     orphan = mk()
     orphan.parent_mandate_id = "missing"
-    assert enforce(orphan, "x", 1, evidence_log=EvidenceLog()).check == "REVOKED"
+    assert (
+        enforce(orphan, "x", 1, evidence_log=EvidenceLog(), currency="GBP").check == "INVALID_CHAIN"
+    )
 
 
 def test_concurrent_siblings_cannot_overspend_parent_budget():
@@ -211,7 +216,7 @@ def test_concurrent_siblings_cannot_overspend_parent_budget():
 
     def spend(child):
         for _ in range(10):
-            results.append(enforce(child, "x", 10, evidence_log=log).allowed)
+            results.append(enforce(child, "x", 10, evidence_log=log, currency="GBP").allowed)
 
     threads = [threading.Thread(target=spend, args=(k,)) for k in kids]
     for t in threads:
@@ -240,5 +245,5 @@ def test_http_registry_malformed_response_fails_closed(body):
 
     reg = HTTPRegistry("http://registry.invalid")
     reg._request = lambda method, path, payload=None: body
-    d = enforce(mk(), "x", 10, evidence_log=EvidenceLog(), registry=reg)
+    d = enforce(mk(), "x", 10, evidence_log=EvidenceLog(), registry=reg, currency="GBP")
     assert not d.allowed and d.check == "REVOKED_REGISTRY"

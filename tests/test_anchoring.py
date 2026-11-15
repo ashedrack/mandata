@@ -6,7 +6,7 @@ def _log_with(n: int) -> EvidenceLog:
     log = EvidenceLog()
     m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100))
     for _ in range(n):
-        enforce(m, "x", 10, evidence_log=log)
+        enforce(m, "x", 10, evidence_log=log, currency="GBP")
     return log
 
 
@@ -15,7 +15,7 @@ def test_anchor_survives_append():
     a = Anchor(head_hash=log.head_hash, service_token="tok", service_url="http://x")
     assert verify_anchor(log, a)
     m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100))
-    enforce(m, "x", 10, evidence_log=log)
+    enforce(m, "x", 10, evidence_log=log, currency="GBP")
     assert verify_anchor(log, a)
 
 

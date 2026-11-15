@@ -14,9 +14,11 @@ from mandata import (
     InMemoryRegistry,
     LifecycleError,
     Mandate,
+    claim,
     delegate,
     enforce,
     settle,
+    unclaim,
     void,
 )
 from mandata.models import EvidenceRecord
@@ -145,14 +147,30 @@ def test_lifecycle_vector(v):
             }
             assert {k: got[k] for k in expect} == expect, d.reason
             continue
-        op, tx_id = ("settle", step["settle"]) if "settle" in step else ("void", step["void"])
         before = len(log.records)
-        if expect.get("error"):
-            with pytest.raises(LifecycleError):
-                (settle if op == "settle" else void)(m, tx_id, evidence_log=log, at=step["at"])
+        try:
+            if "claim" in step:
+                c = step["claim"]
+                tx = claim(
+                    m,
+                    c["tx_id"],
+                    c["payee"],
+                    c["amount"],
+                    c["currency"],
+                    evidence_log=log,
+                    at=step["at"],
+                )
+            elif "unclaim" in step:
+                tx = unclaim(m, step["unclaim"], evidence_log=log, at=step["at"])
+            elif "settle" in step:
+                tx = settle(m, step["settle"], evidence_log=log, at=step["at"])
+            else:
+                tx = void(m, step["void"], evidence_log=log, at=step["at"])
+        except LifecycleError:
+            assert expect.get("error"), f"{v['id']}: unexpected rejection"
             assert len(log.records) == before  # rejected transitions leave no evidence
         else:
-            tx = (settle if op == "settle" else void)(m, tx_id, evidence_log=log, at=step["at"])
+            assert not expect.get("error"), f"{v['id']}: expected rejection"
             assert tx.status == expect["status"]
     assert [r.event for r in log.records] == v["events"]
     assert log.verify_chain()

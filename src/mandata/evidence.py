@@ -23,14 +23,24 @@ class EvidenceLog:
     Pass ``signing_key`` (the gate's Ed25519 key) to sign every record;
     ``verify_chain(public_key=...)`` then also proves each record was written
     by that gate.
+
+    Pass ``store`` (a ``StateStore`` implementing ``append_evidence`` /
+    ``evidence_records``, e.g. ``SQLiteStore``) to persist each record inside
+    the same transaction as the gate's state and ledger updates: decision,
+    reservation and evidence then commit — or roll back — atomically, so a
+    crash cannot leave a decided transaction without its mandatory record
+    (MMF §5.2). Existing records are loaded on construction.
     """
 
     GENESIS = "0" * 64
 
-    def __init__(self, signing_key: SigningKey | None = None) -> None:
+    def __init__(self, signing_key: SigningKey | None = None, store=None) -> None:
         self.records: list[EvidenceRecord] = []
         self._lock = threading.Lock()
         self._signing_key = signing_key
+        self._store = store
+        if store is not None and hasattr(store, "evidence_records"):
+            self.records = store.evidence_records()
 
     @property
     def public_key(self) -> str | None:
@@ -73,7 +83,14 @@ class EvidenceLog:
             if self._signing_key is not None:
                 sig = self._signing_key.sign(record.hash.encode()).signature.hex()
                 record = dataclasses.replace(record, signature=sig)
-            self.records.append(record)
+            if self._store is not None:
+                if hasattr(self._store, "append_evidence"):
+                    # Called by the gate inside store.atomic(): the row joins
+                    # the open transaction, so it commits with the decision.
+                    self._store.append_evidence(record)
+                self.records.append(record)
+            else:
+                self.records.append(record)
         return record
 
     def verify_chain(self, anchored_head: str | None = None, public_key: str | None = None) -> bool:

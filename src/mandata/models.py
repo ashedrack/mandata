@@ -12,10 +12,12 @@ from decimal import Decimal
 
 from .money import is_minor_amount
 
-# Normative check identifiers (MMF §5), in evaluation order. TX_CONFLICT is
-# the pre-evaluation idempotency rule (MMF §5.3), not one of the ten checks.
+# Normative check identifiers (MMF §5), in precedence order. TX_CONFLICT is
+# the pre-evaluation idempotency rule (MMF §5.3) and INVALID_CHAIN the
+# preliminary structural check (MMF §5.1); neither is one of the ten checks.
 CHECKS = (
     "TX_CONFLICT",
+    "INVALID_CHAIN",
     "CREDENTIAL",
     "REVOKED_REGISTRY",
     "REVOKED",
@@ -30,8 +32,8 @@ CHECKS = (
 )
 
 # Evidence events (MMF §5.4): a gate decision, an idempotent replay of one,
-# and the two settlement-lifecycle transitions of an authorization.
-EVENTS = ("DECISION", "REPLAY", "SETTLE", "VOID")
+# and the settlement-lifecycle transitions of an authorization.
+EVENTS = ("DECISION", "REPLAY", "CLAIM", "UNCLAIM", "SETTLE", "VOID")
 
 
 def canonical_number(x: float) -> str:
@@ -121,12 +123,35 @@ class Mandate:
         return (time.time() if at is None else at) > self.expires_at
 
     def chain(self) -> list[Mandate]:
-        """This mandate followed by its resolved ancestors (leaf -> root)."""
-        out, node = [], self
-        while node is not None:
+        """This mandate followed by its resolved ancestors (leaf -> root).
+
+        Stops at a cycle or an unresolvable parent; the gate detects both
+        via ``resolve_chain`` and denies with ``INVALID_CHAIN``.
+        """
+        out, node, seen = [], self, set()
+        while node is not None and id(node) not in seen:
+            seen.add(id(node))
             out.append(node)
             node = node._parent
         return out
+
+    def resolve_chain(self) -> tuple[list[Mandate], str | None]:
+        """Return (resolvable prefix, structural error or None).
+
+        The error is set when an ancestor link cannot be resolved
+        (``parent_mandate_id`` set but no parent bound) or the chain is
+        cyclic — both deny with ``INVALID_CHAIN`` (MMF §5.1).
+        """
+        out, node, seen = [], self, set()
+        while node is not None:
+            if id(node) in seen:
+                return out, "cyclic delegation chain"
+            seen.add(id(node))
+            out.append(node)
+            if node._parent is None and node.parent_mandate_id:
+                return out, f"parent mandate {node.parent_mandate_id} unresolvable"
+            node = node._parent
+        return out, None
 
     def revoke(self) -> None:
         self.revoked = True
@@ -205,22 +230,28 @@ class EvidenceRecord:
         return self.detail or self.check
 
     def canonical_payload(self) -> str:
-        """MMF §5.2 canonical serialization — identical bytes in every implementation."""
-        amount = str(self.amount) if is_minor_amount(self.amount) else "invalid"
-        return "|".join(
-            [
-                self.event,
-                self.tx_id,
-                self.mandate_id,
-                self.agent,
-                self.payee,
-                amount,
-                "true" if self.allowed else "false",
-                self.check,
-                canonical_number(self.timestamp),
-                self.prev_hash,
-            ]
-        )
+        """MMF §5.6 canonical serialization — identical bytes in every implementation.
+
+        Fields are joined by a literal ``|`` byte; field values MUST NOT
+        contain ``|`` (identifiers containing it make the payload ambiguous,
+        so this raises rather than hashing something unverifiable).
+        """
+        fields = [
+            self.event,
+            self.tx_id,
+            self.mandate_id,
+            self.agent,
+            self.payee,
+            str(self.amount) if is_minor_amount(self.amount) else "invalid",
+            "true" if self.allowed else "false",
+            self.check,
+            canonical_number(self.timestamp),
+            self.prev_hash,
+        ]
+        for f in fields:
+            if "|" in f:
+                raise ValueError(f"evidence field contains '|' and cannot be serialized: {f!r}")
+        return "|".join(fields)
 
     @property
     def hash(self) -> str:

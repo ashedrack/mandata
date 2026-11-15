@@ -45,6 +45,7 @@ class ShoppingAgent:
             evidence_log=self.log,
             registry=self.registry,
             tx_id=tx_id,
+            currency="GBP",
         )
         if d.binds(payee, amount):
             receipt = MockRail.settle(payee, amount)

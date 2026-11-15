@@ -20,8 +20,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-# Settlement lifecycle of a transaction (MMF §5.4).
-AUTHORIZED, SETTLED, VOIDED, DENIED = "AUTHORIZED", "SETTLED", "VOIDED", "DENIED"
+# Settlement lifecycle of a transaction (MMF §5.4). CLAIMED is the dispatch
+# state: exactly one worker may claim an authorization before submitting it
+# to the rail, so concurrent dispatchers cannot settle the same approval twice.
+AUTHORIZED, CLAIMED, SETTLED, VOIDED, DENIED = (
+    "AUTHORIZED",
+    "CLAIMED",
+    "SETTLED",
+    "VOIDED",
+    "DENIED",
+)
 
 
 @dataclass(frozen=True)
@@ -57,6 +65,16 @@ class StateStore(Protocol):
     def put_tx(self, tx: TxRecord) -> None: ...
     def atomic(self):
         """Context manager making check-and-record serializable for this store."""
+        ...
+
+    def append_evidence(self, record) -> None:
+        """Durable stores persist an evidence record inside the current
+        ``atomic()`` transaction, so state, ledger and evidence commit — or
+        roll back — together (MMF §5.2). Optional."""
+        ...
+
+    def evidence_records(self) -> list:
+        """Load persisted evidence records in chain order. Optional."""
         ...
 
 
@@ -122,6 +140,13 @@ class SQLiteStore:
             "CREATE TABLE IF NOT EXISTS txs (tx_id TEXT PRIMARY KEY, mandate_id TEXT, "
             "payee TEXT, amount INTEGER, currency TEXT, allowed INTEGER, check_id TEXT, "
             "status TEXT)"
+        )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS evidence ("
+            "seq INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, tx_id TEXT, "
+            "mandate_id TEXT, agent TEXT, payee TEXT, amount INTEGER, "
+            "allowed INTEGER, check_id TEXT, ts REAL, prev_hash TEXT, hash TEXT, "
+            "detail TEXT, signature TEXT)"
         )
         self._lock = threading.RLock()
         self._depth = 0
@@ -192,9 +217,66 @@ class SQLiteStore:
                 ),
             )
 
+    def append_evidence(self, record) -> None:
+        """Insert one evidence row inside the caller's ``atomic()`` transaction.
+
+        Called by ``EvidenceLog`` while the gate holds ``BEGIN IMMEDIATE``, so
+        the ledger, the reservation and the evidence commit or roll back as
+        one operation — a crash cannot leave a decision without its record.
+        """
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO evidence (event, tx_id, mandate_id, agent, payee, "
+                "amount, allowed, check_id, ts, prev_hash, hash, detail, signature) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    record.event,
+                    record.tx_id,
+                    record.mandate_id,
+                    record.agent,
+                    record.payee,
+                    record.amount,
+                    int(record.allowed),
+                    record.check,
+                    record.timestamp,
+                    record.prev_hash,
+                    record.hash,
+                    record.detail,
+                    record.signature,
+                ),
+            )
+
+    def evidence_records(self) -> list:
+        """Reload persisted evidence records in insertion (chain) order."""
+        from .models import EvidenceRecord
+
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT event, tx_id, mandate_id, agent, payee, amount, allowed, "
+                "check_id, ts, prev_hash, detail, signature FROM evidence ORDER BY seq"
+            ).fetchall()
+        return [
+            EvidenceRecord(
+                mandate_id=r[2],
+                agent=r[3],
+                payee=r[4],
+                amount=r[5],
+                allowed=bool(r[6]),
+                check=r[7],
+                timestamp=r[8],
+                prev_hash=r[9],
+                detail=r[10] or "",
+                tx_id=r[1],
+                event=r[0],
+                signature=r[11] or "",
+            )
+            for r in rows
+        ]
+
 
 __all__ = [
     "AUTHORIZED",
+    "CLAIMED",
     "DENIED",
     "SETTLED",
     "VOIDED",

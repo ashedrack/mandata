@@ -83,17 +83,17 @@ def test_from_minor_and_custom_currency():
 
 def test_settled_or_voided_decision_no_longer_binds():
     m, log = mk(), EvidenceLog()
-    d = enforce(m, "tesco.com", 500, tx_id="t1", evidence_log=log)
+    d = enforce(m, "tesco.com", 500, tx_id="t1", evidence_log=log, currency="GBP")
     assert d.binds("tesco.com", 500)
     settle(m, "t1", evidence_log=log)
-    retry = enforce(m, "tesco.com", 500, tx_id="t1", evidence_log=log)
+    retry = enforce(m, "tesco.com", 500, tx_id="t1", evidence_log=log, currency="GBP")
     assert retry.replayed and retry.status == "SETTLED"
     assert not retry.binds("tesco.com", 500)  # a retry can never be settled twice
 
 
 def test_lifecycle_for_wrong_mandate_rejected():
     a, b, log = mk(), mk(), EvidenceLog()
-    enforce(a, "x", 10, tx_id="t1", evidence_log=log)
+    enforce(a, "x", 10, tx_id="t1", evidence_log=log, currency="GBP")
     with pytest.raises(LifecycleError):
         settle(b, "t1", evidence_log=log)
 
@@ -102,19 +102,25 @@ def test_void_releases_reservation_across_delegation_chain():
     parent = mk(total_budget=100)
     child = delegate(parent, "sub", Bounds(max_amount=100, total_budget=100))
     log = EvidenceLog()
-    assert enforce(child, "x", 100, tx_id="t1", evidence_log=log).allowed
-    assert enforce(parent, "x", 1, tx_id="p1", evidence_log=log).check == "BUDGET"
+    assert enforce(child, "x", 100, tx_id="t1", evidence_log=log, currency="GBP").allowed
+    assert enforce(parent, "x", 1, tx_id="p1", evidence_log=log, currency="GBP").check == "BUDGET"
     void(child, "t1", evidence_log=log)
-    assert enforce(parent, "x", 1, tx_id="p2", evidence_log=log).allowed
+    assert enforce(parent, "x", 1, tx_id="p2", evidence_log=log, currency="GBP").allowed
 
 
 def test_idempotency_survives_restart(tmp_path):
     path = tmp_path / "gate.db"
     m = mk(total_budget=100)
-    assert enforce(m, "x", 80, tx_id="t1", store=SQLiteStore(path), evidence_log=EvidenceLog())
-    d = enforce(m, "x", 80, tx_id="t1", store=SQLiteStore(path), evidence_log=EvidenceLog())
+    assert enforce(
+        m, "x", 80, tx_id="t1", store=SQLiteStore(path), evidence_log=EvidenceLog(), currency="GBP"
+    )
+    d = enforce(
+        m, "x", 80, tx_id="t1", store=SQLiteStore(path), evidence_log=EvidenceLog(), currency="GBP"
+    )
     assert d.replayed and d.allowed  # same answer after reopening the store
-    d2 = enforce(m, "x", 80, tx_id="t2", store=SQLiteStore(path), evidence_log=EvidenceLog())
+    d2 = enforce(
+        m, "x", 80, tx_id="t2", store=SQLiteStore(path), evidence_log=EvidenceLog(), currency="GBP"
+    )
     assert d2.check == "BUDGET"  # the first reservation still counts
 
 
@@ -130,7 +136,14 @@ def _spend_worker(path: str, start: int, n: int, out) -> None:
     allowed = 0
     for i in range(n):
         d = enforce(
-            m, "x", 10, tx_id=f"w{start}-{i}", store=store, evidence_log=EvidenceLog(), at=1000
+            m,
+            "x",
+            10,
+            tx_id=f"w{start}-{i}",
+            store=store,
+            evidence_log=EvidenceLog(),
+            at=1000,
+            currency="GBP",
         )
         allowed += d.allowed
     out.put(allowed)
@@ -207,7 +220,9 @@ def test_ap2_cart_gate_and_payment_mandate_binding():
 
 
 def test_denied_decision_never_binds():
-    d = enforce(mk(allowed_payees=["tesco.com"]), "evil.io", 10, evidence_log=EvidenceLog())
+    d = enforce(
+        mk(allowed_payees=["tesco.com"]), "evil.io", 10, evidence_log=EvidenceLog(), currency="GBP"
+    )
     assert not d.binds("evil.io", 10)
 
 
@@ -237,7 +252,7 @@ def test_signed_evidence_verifies_and_detects_forgery():
     key = SigningKey.generate()
     log = EvidenceLog(signing_key=key)
     m = mk()
-    enforce(m, "x", 10, tx_id="t1", evidence_log=log)
+    enforce(m, "x", 10, tx_id="t1", evidence_log=log, currency="GBP")
     settle(m, "t1", evidence_log=log)
     assert log.verify_chain(public_key=log.public_key)
 
@@ -263,7 +278,7 @@ def test_signed_evidence_verifies_and_detects_forgery():
 
 def test_unsigned_log_fails_signature_verification():
     log = EvidenceLog()
-    enforce(mk(), "x", 10, evidence_log=log)
+    enforce(mk(), "x", 10, evidence_log=log, currency="GBP")
     assert log.verify_chain() and not log.verify_chain(
         public_key=SigningKey.generate().verify_key.encode().hex()
     )

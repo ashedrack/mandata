@@ -53,6 +53,8 @@ def register_currency(code: str, exponent: int) -> None:
 
 def exponent(currency: str) -> int:
     """Number of decimal places in one major unit of ``currency``."""
+    if not isinstance(currency, str) or not currency:
+        raise ValueError(f"currency must be a non-empty string, got {currency!r}")
     return _EXPONENTS.get(currency.upper(), DEFAULT_EXPONENT)
 
 

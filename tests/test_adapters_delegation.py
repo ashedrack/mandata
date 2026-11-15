@@ -32,7 +32,7 @@ def test_delegation_stricter_child_allowed():
     )
     child = delegate(parent, "a-sub", Bounds(max_amount=50, allowed_payees=["tesco"]))
     assert child.parent_mandate_id == parent.mandate_id
-    assert enforce(child, "tesco", 40, evidence_log=EvidenceLog()).allowed
+    assert enforce(child, "tesco", 40, evidence_log=EvidenceLog(), currency="GBP").allowed
 
 
 def test_delegation_rejects_looser_bounds():

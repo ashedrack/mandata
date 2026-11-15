@@ -11,7 +11,7 @@ signed payment payload whose ``to``/``value`` differ from what was approved.
 
 from __future__ import annotations
 
-from ..enforce import enforce
+from ..enforce import LifecycleError, claim, enforce
 from ..models import Bounds, Decision, Mandate
 
 
@@ -64,10 +64,20 @@ def enforce_requirements(mandate: Mandate, req: dict, tx_id: str, **kwargs) -> D
     )
 
 
-def bind_payment(decision: Decision, payment_payload: dict) -> None:
+def bind_payment(
+    decision: Decision,
+    payment_payload: dict,
+    mandate: Mandate | None = None,
+    **claim_kwargs,
+) -> None:
     """Raise PayeeBindingError unless the signed payment pays exactly what the
     gate approved. Accepts an x402 payment payload (``payload.authorization``)
-    or a bare authorization dict with ``to``/``value``."""
+    or a bare authorization dict with ``to``/``value``.
+
+    When ``mandate`` is given, the authorization is also *claimed* for
+    dispatch (MMF §5.4): the instruction binds and the single dispatch slot is
+    taken atomically, so two workers can never both release the payment.
+    """
     auth = (payment_payload.get("payload") or {}).get("authorization") or payment_payload
     to, value = auth.get("to"), _atomic(auth.get("value"))
     if not decision.binds(str(to), value):
@@ -75,3 +85,8 @@ def bind_payment(decision: Decision, payment_payload: dict) -> None:
             f"payment to {to!r} for {value!r} does not bind to approved decision "
             f"{decision.tx_id} ({decision.payee!r}, {decision.amount!r}, {decision.status})"
         )
+    if mandate is not None:
+        try:
+            claim(mandate, decision.tx_id, str(to), value, decision.currency, **claim_kwargs)
+        except LifecycleError as exc:
+            raise PayeeBindingError(str(exc)) from exc
