@@ -1,3 +1,23 @@
+## [0.4.9] — implements MMF-v0.3.9
+
+- **Ledger-first ordering made structural**: the chain is re-resolved inside
+  the serialization after the ledger lookup; a changed chain identity fails
+  closed as `INVALID_CHAIN`, so a decided `tx_id` stays replayable no matter
+  what happens to the delegation graph afterward.
+- **Normative REJECTED causes**: rejected lifecycle transitions now record
+  `check` as `<OP>:<CAUSE>` (`UNKNOWN_TX`, `STATUS`, `BINDING`, `REVOKED`,
+  `EXPIRED`, `REGISTRY`, `CANCELLATION`), so conforming implementations
+  produce identical records for identical rejections.
+- **Cancellation binding**: the spec now requires a `void` cancellation
+  reference to attest non-execution for the specific transaction, bound to
+  the rail instruction/idempotency key, via a trusted channel, retained for
+  audit.
+- **Timestamp input**: integer epoch milliseconds is the normative input;
+  float-seconds conversion is an API convenience.
+- **New golden vector** `spec/vectors/credential.json` (C01): canonical
+  bounds payload, signed payload and deterministic Ed25519 signature for a
+  fixed seed — 69 vectors, 199 tests.
+
 # Changelog
 
 ## [0.4.8] — implements MMF-v0.3.8
