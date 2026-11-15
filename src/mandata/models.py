@@ -221,6 +221,7 @@ class EvidenceRecord:
     timestamp: float
     prev_hash: str
     detail: str = ""
+    reference: str = ""
     tx_id: str = ""
     event: str = "DECISION"
     currency: str = ""
@@ -233,17 +234,23 @@ class EvidenceRecord:
         return self.detail or self.check
 
     def canonical_payload(self) -> str:
-        """MMF §5.6 canonical serialization — identical bytes in every implementation.
+        """MMF §5.6 canonical serialization (v3) — identical bytes in every
+        implementation.
 
-        Fields are joined by a literal ``|`` byte; field values MUST NOT
-        contain ``|`` (identifiers containing it make the payload ambiguous,
-        so this raises rather than hashing something unverifiable).
+        Each field is ``<UTF-8 byte length>:<UTF-8 bytes>`` and fields are
+        joined by single ``|`` bytes (which are never parsed — the length
+        makes the format self-delimiting, so a field value may legally
+        contain ``|`` or any other byte). A malformed or adversarial input
+        can therefore always be recorded instead of rejected for
+        delimiter-sensitivity.
         """
-        # MMF-v0.3.2 canonical form (v2): every security-relevant field is
-        # hashed, including the transaction currency and the lifecycle status
-        # the record transitions to ("" for records without one). String
-        # fields are UTF-8 NFC; absent fields are the empty string; ALLOWED is
-        # the literal "true"/"false".
+        # Field order is normative. TIMESTAMP is the integer Unix-millisecond
+        # value nearest the record timestamp (round-half-up on the IEEE-754
+        # value — identical in every conforming language). REFERENCE carries
+        # normative provenance such as a cancellation reference; "" when
+        # absent. The advisory ``detail`` string is deliberately NOT hashed:
+        # denial-reason prose is implementation-specific, while the payload
+        # must be byte-identical across implementations.
         fields = [
             self.event,
             self.tx_id,
@@ -255,14 +262,13 @@ class EvidenceRecord:
             "true" if self.allowed else "false",
             self.check,
             self.status,
-            canonical_number(self.timestamp),
+            self.reference or "",
+            str(math.floor(self.timestamp * 1000 + 0.5)),
             self.prev_hash,
         ]
-        fields = [unicodedata.normalize("NFC", f) for f in fields]
-        for f in fields:
-            if "|" in f:
-                raise ValueError(f"evidence field contains '|' and cannot be serialized: {f!r}")
-        return "|".join(fields)
+        return "|".join(
+            f"{len(f.encode('utf-8'))}:{unicodedata.normalize('NFC', f)}" for f in fields
+        )
 
     @property
     def hash(self) -> str:

@@ -109,7 +109,7 @@ def test_claim_slot_is_permanently_consumed():
     enforce(m, "x", 10, currency="GBP", tx_id="t1", evidence_log=log, at=1000)
     claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1000)
     # operator confirms the rail was never invoked -> void releases budget
-    void(m, "t1", evidence_log=log, at=1001, confirmed_rail_cancelled=True)
+    void(m, "t1", evidence_log=log, at=1001, cancellation="rail-decline:confirmed")
     # but the claim slot stays consumed: same tx_id can never dispatch again
     with pytest.raises(LifecycleError):
         claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1002)
@@ -133,7 +133,7 @@ def test_settle_and_void_accept_claimed():
 
     enforce(m2, "x", 10, currency="GBP", tx_id="t2", evidence_log=EvidenceLog(), at=1000)
     claim(m2, "t2", "x", 10, "GBP")
-    assert void(m2, "t2", at=1000, confirmed_rail_cancelled=True).status == VOIDED
+    assert void(m2, "t2", at=1000, cancellation="rail-decline:confirmed").status == VOIDED
 
 
 def test_concurrent_claimers_single_winner(tmp_path):
@@ -236,7 +236,9 @@ def test_failed_evidence_append_rolls_back_state(tmp_path):
     assert store.evidence_records() == []
 
 
-def test_pipe_in_identifier_fails_closed():
+def test_pipe_in_identifier_serializes_under_length_prefix():
+    # v3 payloads are length-prefixed, so "|" inside a field is unambiguous —
+    # malformed identifiers can always be recorded rather than dropped.
     rec = EvidenceRecord(
         mandate_id="m1",
         agent="a",
@@ -247,8 +249,7 @@ def test_pipe_in_identifier_fails_closed():
         timestamp=1000,
         prev_hash="0" * 64,
     )
-    with pytest.raises(ValueError):
-        rec.canonical_payload()
+    assert "8:bad|pipe" in rec.canonical_payload()
 
 
 def test_rejected_lifecycle_transitions_are_security_evidence():
@@ -319,7 +320,7 @@ def test_void_releases_budget_but_not_velocity():
     m = mk(velocity_limit=1, total_budget=100)
     log = EvidenceLog()
     assert enforce(m, "x", 10, currency="GBP", tx_id="t1", evidence_log=log, at=1000).allowed
-    void(m, "t1", evidence_log=log, at=1001, confirmed_rail_cancelled=True)
+    void(m, "t1", evidence_log=log, at=1001, cancellation="rail-decline:confirmed")
     # budget refunded but the authorization slot is spent: still VELOCITY
     d = enforce(m, "x", 10, currency="GBP", tx_id="t2", evidence_log=log, at=1002)
     assert not d.allowed and d.check == "VELOCITY"

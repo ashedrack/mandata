@@ -746,7 +746,7 @@
           "expect": {
             "status": "VOIDED"
           },
-          "confirmed_rail_cancelled": true
+          "cancellation": "rail-decline:pay_1"
         },
         {
           "claim": {
@@ -843,7 +843,7 @@
           "expect": {
             "status": "VOIDED"
           },
-          "confirmed_rail_cancelled": true
+          "cancellation": "rail-decline:pay_1"
         }
       ],
       "events": [
@@ -896,10 +896,10 @@
         {
           "void": "t1",
           "at": 1003,
-          "confirmed_rail_cancelled": true,
           "expect": {
             "status": "VOIDED"
-          }
+          },
+          "cancellation": "rail-decline:pay_1"
         }
       ],
       "events": [

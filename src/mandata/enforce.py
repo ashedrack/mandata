@@ -18,7 +18,7 @@ from contextlib import ExitStack, contextmanager
 
 from .evidence import EvidenceLog
 from .models import Decision, Mandate, _is_finite_number
-from .money import is_minor_amount
+from .money import MAX_AMOUNT, is_minor_amount
 from .state import AUTHORIZED, CLAIMED, DENIED, SETTLED, VOIDED, TxRecord
 
 _DEFAULT_LOG = EvidenceLog()
@@ -272,7 +272,7 @@ def void(
     store=None,
     at: float | None = None,
     clock: Callable[[], float] = time.time,
-    confirmed_rail_cancelled: bool = False,
+    cancellation: str | None = None,
 ) -> TxRecord:
     """Release an AUTHORIZED or CLAIMED transaction that will never settle.
 
@@ -281,25 +281,25 @@ def void(
     authorize-and-void cycle cannot evade the rate limit (MMF §5.1).
 
     Voiding a CLAIMED transaction releases budget while a payment may be in
-    flight, so it is a reconciliation action requiring
-    ``confirmed_rail_cancelled=True``: call it only with authoritative
-    confirmation that the rail did not execute and cannot subsequently
-    execute the instruction (a definitive decline, or proof the instruction
-    never left). An uncertain in-flight outcome MUST stay CLAIMED —
-    releasing the reservation early would let spend escape the budget. The
-    claim slot is permanently consumed either way, so a retry uses a new
-    ``tx_id``.
+    flight, so it is a reconciliation action requiring a ``cancellation``
+    reference: a non-empty identifier of the authoritative confirmation that
+    the rail did not execute and cannot subsequently execute the
+    instruction — a rail decline response ID, an adapter verdict, or a
+    reconciliation record from a trusted source (MMF §5.4). The reference is
+    hashed into the VOID evidence record's ``detail`` field, so *what*
+    justified releasing the reservation is itself auditable. An uncertain
+    in-flight outcome MUST stay CLAIMED — releasing the reservation early
+    would let spend escape the budget. The claim slot is permanently
+    consumed either way, so a retry uses a new ``tx_id``.
 
     Idempotent for already-voided transactions. A SETTLED transaction cannot
     be voided: refunds are a rail concern (MMF §8).
     """
-    return _transition(
-        mandate, tx_id, VOIDED, evidence_log, store, at, clock, confirmed_rail_cancelled
-    )
+    return _transition(mandate, tx_id, VOIDED, evidence_log, store, at, clock, cancellation)
 
 
 def _transition(
-    mandate, tx_id, target, evidence_log, store, at, clock, confirmed_rail_cancelled=False
+    mandate, tx_id, target, evidence_log, store, at, clock, cancellation=None
 ) -> TxRecord:
     at = clock() if at is None else at
     log = evidence_log or _DEFAULT_LOG
@@ -316,7 +316,7 @@ def _transition(
             return tx  # idempotent repeat: unchanged, no evidence
         elif tx.status not in (AUTHORIZED, CLAIMED):
             err = f"cannot move {tx_id} from {tx.status} to {target}"
-        elif target == VOIDED and tx.status == CLAIMED and not confirmed_rail_cancelled:
+        elif target == VOIDED and tx.status == CLAIMED and not cancellation:
             err = (
                 f"cannot void claimed transaction {tx_id} without authoritative "
                 "confirmation the rail did not execute — an uncertain in-flight "
@@ -357,6 +357,7 @@ def _transition(
                 detail=f"{tx_id} {target.lower()}",
                 tx_id=tx_id,
                 event="SETTLE" if target == SETTLED else "VOID",
+                reference=cancellation or "",
                 currency=tx.currency or "",
                 status=target,
             )
@@ -387,8 +388,10 @@ def _label(node: Mandate, mandate: Mandate) -> str:
     return "mandate" if node is mandate else f"ancestor mandate {node.mandate_id}"
 
 
-def _spend(node: Mandate, store, at: float, window_days: int) -> tuple[int, int]:
-    return (store or node._state).spend(node.mandate_id, at - window_days * 86400)
+def _spend(node: Mandate, store, at: float, window_days: int | None) -> tuple[int, int]:
+    # A None window means "all recorded history" (the accumulated total).
+    since = 0.0 if window_days is None else at - window_days * 86400
+    return (store or node._state).spend(node.mandate_id, since)
 
 
 def _evaluate(mandate, chain, payee, amount, currency, at, store, registry, credential, key):
@@ -456,7 +459,9 @@ def _evaluate(mandate, chain, payee, amount, currency, at, store, registry, cred
         budget = node.bounds.total_budget
         if budget is not None:
             _, spent = _spend(node, store, at, node.bounds.budget_window_days)
-            if spent + amount > budget:
+            # Checked arithmetic (MMF §3.1): an accumulated total beyond
+            # 2^53-1 is outside the exact-representation bound — fail safe.
+            if spent + amount > MAX_AMOUNT or spent + amount > budget:
                 return "BUDGET", f"{_label(node, mandate)} budget {budget} would be exceeded"
 
     return "WITHIN", "within mandate"

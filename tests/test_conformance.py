@@ -167,7 +167,7 @@ def test_lifecycle_vector(v):
                     step["void"],
                     evidence_log=log,
                     at=step["at"],
-                    confirmed_rail_cancelled=step.get("confirmed_rail_cancelled", False),
+                    cancellation=step.get("cancellation"),
                 )
         except LifecycleError:
             assert expect.get("error"), f"{v['id']}: unexpected rejection"
