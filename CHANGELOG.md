@@ -1,3 +1,22 @@
+## [0.4.10] — implements MMF-v0.3.10
+
+- **Resolution failure is a result, never an exception**: preliminary chain
+  resolution is non-authoritative — a malformed link, cycle or unavailable
+  ancestor cannot terminate evaluation before the serialized ledger lookup;
+  a decided `tx_id` stays retrievable under an invalid chain. Spec makes the
+  identity-change vs resolution-failure distinction explicit.
+- **Rejection precedence**: `REJECTED` evidence `<OP>:<CAUSE>` now has a
+  fixed evaluation order (CLAIM: UNKNOWN_TX→STATUS→BINDING→REVOKED→EXPIRED→
+  REGISTRY; SETTLE/VOID: UNKNOWN_TX→STATUS→CANCELLATION) — lifecycle
+  rejections are as deterministic as authorization denials.
+- **Exact-bytes evidence**: NFC normalization removed from canonical
+  serialization — evidence preserves the exact submitted value, reconciled
+  with §5.3's unnormalized request equality (payee identifiers stay
+  byte-sensitive end to end).
+- **Negative credential vectors** C02–C06: bad signature, tampered bounds
+  hash, wrong issuer, wrong agent, wrong mandate — all MUST fail
+  verification. 74 vectors, 204 tests.
+
 ## [0.4.9] — implements MMF-v0.3.9
 
 - **Ledger-first ordering made structural**: the chain is re-resolved inside
