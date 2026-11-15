@@ -66,7 +66,12 @@ class HTTPRegistry:
             return json.loads(resp.read() or b"{}")
 
     def is_revoked(self, mandate_id: str) -> bool:
-        return bool(self._request("GET", f"/revoked/{mandate_id}").get("revoked"))
+        body = self._request("GET", f"/revoked/{mandate_id}")
+        revoked = body.get("revoked") if isinstance(body, dict) else None
+        if not isinstance(revoked, bool):
+            # Malformed answer: raise so the gate fails closed (MMF §5).
+            raise TypeError(f"registry returned malformed revocation status: {body!r}")
+        return revoked
 
     def revoke(self, mandate_id: str) -> None:
         self._request("POST", f"/revoked/{mandate_id}", {"revoked": True})

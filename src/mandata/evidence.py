@@ -28,8 +28,9 @@ class EvidenceLog:
         payee: str,
         amount: float,
         allowed: bool,
-        reason: str,
+        check: str,
         timestamp: float | None = None,
+        detail: str = "",
     ) -> EvidenceRecord:
         with self._lock:
             record = EvidenceRecord(
@@ -38,17 +39,30 @@ class EvidenceLog:
                 payee=payee,
                 amount=amount,
                 allowed=allowed,
-                reason=reason,
-                timestamp=timestamp or time.time(),
+                check=check,
+                timestamp=time.time() if timestamp is None else timestamp,
                 prev_hash=self.head_hash,
+                detail=detail,
             )
             self.records.append(record)
         return record
 
-    def verify_chain(self) -> bool:
+    def verify_chain(self, anchored_head: str | None = None) -> bool:
+        """Recompute every record hash and check each link.
+
+        Detects modification, insertion, deletion, or reordering of any record
+        that has a successor. On its own a hash chain cannot detect removal of
+        the most recent records (tail truncation) or an edit to the final
+        record; pass ``anchored_head`` — a head hash previously published to
+        an external anchor — to also require that the chain still contains
+        that point, which detects truncation or rewriting up to the anchor.
+        """
         prev = self.GENESIS
+        seen_anchor = anchored_head is None or anchored_head == self.GENESIS
         for rec in self.records:
             if rec.prev_hash != prev:
                 return False
             prev = rec.hash
-        return True
+            if prev == anchored_head:
+                seen_anchor = True
+        return seen_anchor

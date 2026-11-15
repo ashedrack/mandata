@@ -14,15 +14,32 @@ from dataclasses import dataclass
 from nacl.exceptions import BadSignatureError
 from nacl.signing import SigningKey, VerifyKey
 
-from .models import Mandate
+from .models import Mandate, canonical_number
 
 
 def bounds_hash(mandate: Mandate) -> str:
-    """Canonical hash of the mandate's bounds — the thing credentials sign over."""
+    """Canonical hash over every authority-bearing field of the mandate.
+
+    Covers all bounds plus principal, issuance time and delegation link, so no
+    field that widens or redirects authority can change without breaking the
+    signature (MMF §6).
+    """
     b = mandate.bounds
-    payees = ",".join(sorted(b.allowed_payees))
-    payload = f"{b.max_amount}|{b.currency}|{payees}|{b.expires_in_days}|{b.velocity_limit}"
-    return hashlib.sha256(payload.encode()).hexdigest()
+    payload = "|".join(
+        [
+            mandate.principal,
+            canonical_number(mandate.issued_at),
+            mandate.parent_mandate_id or "",
+            canonical_number(b.max_amount),
+            b.currency,
+            ",".join(sorted(b.allowed_payees)),
+            str(b.expires_in_days),
+            str(b.velocity_limit),
+            "" if b.total_budget is None else canonical_number(b.total_budget),
+            str(b.budget_window_days),
+        ]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -37,21 +54,24 @@ class Credential:
     public_key: str  # hex — principal's verify key
 
     def payload(self) -> bytes:
-        return f"{self.mandate_id}|{self.agent}|{self.bounds_hash}|{self.expires_at}".encode()
+        return _payload(self.mandate_id, self.agent, self.bounds_hash, self.expires_at)
+
+
+def _payload(mandate_id: str, agent: str, bh: str, expires_at: float) -> bytes:
+    return f"{mandate_id}|{agent}|{bh}|{canonical_number(expires_at)}".encode()
 
 
 def issue_credential(mandate: Mandate, signing_key: SigningKey) -> Credential:
     """Principal signs a credential for a mandate + agent."""
     bh = bounds_hash(mandate)
     expires_at = mandate.expires_at
-    payload = f"{mandate.mandate_id}|{mandate.agent}|{bh}|{expires_at}".encode()
-    signature = signing_key.sign(payload).signature.hex()
+    signature = signing_key.sign(_payload(mandate.mandate_id, mandate.agent, bh, expires_at))
     return Credential(
         mandate_id=mandate.mandate_id,
         agent=mandate.agent,
         bounds_hash=bh,
         expires_at=expires_at,
-        signature=signature,
+        signature=signature.signature.hex(),
         public_key=signing_key.verify_key.encode().hex(),
     )
 
@@ -67,7 +87,7 @@ def verify_credential(
     Checks: signature validity, key match, mandate/agent binding, bounds integrity,
     expiry. Returns (ok, reason).
     """
-    at = at or time.time()
+    at = time.time() if at is None else at
 
     if credential.public_key != expected_public_key:
         return False, "credential signed by unexpected key"
@@ -83,6 +103,6 @@ def verify_credential(
         VerifyKey(bytes.fromhex(credential.public_key)).verify(
             credential.payload(), bytes.fromhex(credential.signature)
         )
-    except BadSignatureError:
+    except (BadSignatureError, ValueError, TypeError):
         return False, "invalid signature"
     return True, "credential valid"

@@ -3,12 +3,13 @@
 from .delegation import delegate
 from .enforce import enforce
 from .evidence import EvidenceLog
-from .models import Bounds, Decision, EvidenceRecord, Mandate
+from .models import CHECKS, Bounds, Decision, EvidenceRecord, Mandate, canonical_number
 from .revocation import HTTPRegistry, InMemoryRegistry, RevocationRegistry
 from .state import InMemoryStore, SQLiteStore, StateStore
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
+    "CHECKS",
     "Bounds",
     "Decision",
     "EvidenceLog",
@@ -20,6 +21,7 @@ __all__ = [
     "RevocationRegistry",
     "SQLiteStore",
     "StateStore",
+    "canonical_number",
     "delegate",
     "enforce",
 ]

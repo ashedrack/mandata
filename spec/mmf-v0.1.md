@@ -1,6 +1,10 @@
 # The Mandata Mandate Format (MMF) — v0.1
 
-**Status:** Draft specification
+> **Superseded by [MMF-v0.2](mmf-v0.2.md).** v0.1 contained delegation and
+> evidence ambiguities that allowed scope widening and non-portable hashes;
+> see §9 of v0.2. This document is kept for reference only.
+
+**Status:** Superseded draft specification
 **Reference implementation:** `mandata` (Python), `mandata` (TypeScript)
 **License:** Apache-2.0
 

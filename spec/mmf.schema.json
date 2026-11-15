@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Mandata Mandate Format v0.1",
+  "title": "Mandata Mandate Format v0.2",
   "type": "object",
   "required": ["mandate_id", "principal", "agent", "issued_at", "revoked", "bounds"],
   "properties": {
@@ -12,14 +12,14 @@
     "parent_mandate_id": {"type": ["string", "null"]},
     "bounds": {
       "type": "object",
-      "required": ["max_amount", "currency", "allowed_payees", "expires_in_days", "velocity_limit"],
+      "required": ["max_amount", "currency", "allowed_payees", "expires_in_days", "velocity_limit", "budget_window_days"],
       "properties": {
         "max_amount": {"type": "number", "exclusiveMinimum": 0},
-        "currency": {"type": "string"},
-        "allowed_payees": {"type": "array", "items": {"type": "string"}},
+        "currency": {"type": "string", "minLength": 1},
+        "allowed_payees": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "expires_in_days": {"type": "integer", "minimum": 1},
         "velocity_limit": {"type": "integer", "minimum": 0},
-        "total_budget": {"type": ["number", "null"]},
+        "total_budget": {"type": ["number", "null"], "exclusiveMinimum": 0},
         "budget_window_days": {"type": "integer", "minimum": 1}
       }
     }

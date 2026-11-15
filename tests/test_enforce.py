@@ -73,7 +73,7 @@ def test_evidence_chain_detects_tampering():
         payee=log.records[0].payee,
         amount=999.0,
         allowed=True,
-        reason="forged",
+        check="WITHIN",
         timestamp=log.records[0].timestamp,
         prev_hash=log.records[0].prev_hash,
     )
