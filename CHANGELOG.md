@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.5] — implements MMF-v0.3.5
+
+Specification-closure release (no behavior change):
+
+- **Three-level dispatch guarantee** — the gate guarantees at most one successful claim per `tx_id`; at-most-once rail submission additionally requires a trusted dispatcher that never resubmits an ambiguous instruction; exactly-once execution remains the rail's idempotency-key responsibility.
+- **Normative evidence serialization table** — per-field type, permitted encoding, null representation (`0:`), and normalization (NFC strings, `true`/`false`, `invalid` amounts, 64-hex `prev_hash`).
+- **Evidence obligations scoped to completed, durably committed evaluations** — completed decision ⇒ one record; aborted evaluation ⇒ no record and no authorization released; requests that never reach the gate are outside the audit scope.
+
 ## [0.4.4] — implements MMF-v0.3.4
 
 - **Canonical evidence v3 (breaking).** Fields serialize as `<UTF-8 byte length>:<value>` joined by `|` — self-delimiting, so any field value (including `|`) is encodable and malformed instructions can always be recorded. Chains produced by ≤0.4.3 do not verify under this version.
