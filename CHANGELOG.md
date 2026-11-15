@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.6] — implements MMF-v0.3.6
+
+- **`claim` re-verifies revocation** — an AUTHORIZED transaction of a revoked mandate (local flag or registry, fail-closed) can no longer be dispatched: the kill switch now reaches the dispatch point, not just new evaluations. `settle`/`void` proceed post-revocation (they record facts, not grants); replays return the historical decision.
+- **Delegation model stated** — principal-authorized delegation with agent-selected attenuation: the agent proposes attenuated bounds; the root principal signs every chain credential.
+- **Request equality specified** — exact, unnormalized field-wise comparison (`49.99` ≠ `"49.99"` ≠ `4999`); malformed requests enter the ledger as durable replayable denials.
+- 196 tests, 66 vectors.
+
 ## [0.4.5] — implements MMF-v0.3.5
 
 Specification-closure release (no behavior change):
