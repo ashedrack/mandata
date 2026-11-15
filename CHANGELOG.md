@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] — implements MMF-v0.3.2
+
+Correctness release addressing the second-round review on 0.4.1.
+Conformance vectors: 65 (30 core + 17 delegation + 15 lifecycle + 3 evidence-hash).
+
+### Security
+- **The claim slot is permanently consumed.** `unclaim()` is removed: a `tx_id`
+  can be claimed at most once, unconditionally. Recovery for a claimed transaction
+  confirmed never submitted is `void()` (releases the reservation) plus a **new**
+  `tx_id` — an unknown rail outcome stays CLAIMED. This upgrades "at most one
+  claim while claimed" to "at most one dispatch per tx_id", with no reliance on
+  correct operator judgement.
+- **Rejected lifecycle transitions are evidence.** A failed `claim`/`settle`/`void`
+  (binding mismatch, wrong state, unknown `tx_id`, wrong mandate) appends a
+  `REJECTED` record — a binding-mismatched claim is exactly the substitution
+  signal the audit exists to catch.
+- **Velocity counts issued authorizations.** Voiding releases the budget
+  reservation but not the velocity slot, so authorize-and-void cycling can no
+  longer evade a rate limit. `spend()` now returns (issued, outstanding);
+  released spend rows are marked, not deleted. SQLite stores gain a `released`
+  column (auto-migrated).
+- **Canonical evidence v2.** The record hash now covers `currency` and the
+  lifecycle `status` the record establishes, so no security-relevant field is
+  outside the hash. String fields are UTF-8 NFC; absent fields serialize as the
+  empty string. Golden vectors include CLAIM and REJECTED records.
+- **Budget-window attenuation.** A child mandate's `budget_window_days` must be
+  ≥ the parent's when the parent has a `total_budget` — a shorter window cycles
+  the allowance faster and is wider, not narrower.
+
+### Specified (no code change)
+- `tx_id` namespace: ledger keys are unique per gate/store, not per mandate;
+  cross-mandate collision denies `TX_CONFLICT` (already the behavior); lifecycle
+  ops verify `mandate_id` (already enforced).
+- Issuer authority: every chain member's credential verifies against the root
+  principal's key — a delegate agent cannot self-issue (already the behavior).
+- `INVALID_CHAIN` denials are serialized on the leaf mandate, so their ledger
+  lookup and evidence append are atomic like every other denial (already the
+  behavior; now normative).
+
+### Breaking
+- `unclaim()` removed (use `void()` + a new `tx_id`).
+- Evidence hashes change (canonical v2): chains written by 0.4.x will not verify
+  under 0.4.2. Regenerate or migrate by re-hashing.
+- Void no longer frees velocity slots: tests relying on authorize→void→authorize
+  within a velocity window will now see VELOCITY denials.
+
 ## [0.4.1] — implements MMF-v0.3.1
 
 Correctness release addressing review findings on the 0.4.0 security semantics.

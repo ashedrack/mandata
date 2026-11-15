@@ -93,17 +93,26 @@ class InMemoryStore:
 
     def record(self, mandate_id: str, timestamp: float, amount: int, tx_id: str) -> None:
         with self._lock:
-            self._records.setdefault(mandate_id, []).append((timestamp, amount, tx_id))
+            self._records.setdefault(mandate_id, []).append((timestamp, amount, tx_id, False))
 
     def release(self, mandate_id: str, tx_id: str) -> None:
         with self._lock:
             rows = self._records.get(mandate_id, [])
-            self._records[mandate_id] = [r for r in rows if r[2] != tx_id]
+            self._records[mandate_id] = [
+                (ts, a, tid, True if tid == tx_id else rel) for ts, a, tid, rel in rows
+            ]
 
     def spend(self, mandate_id: str, since: float) -> tuple[int, int]:
+        """(issued authorizations in window, outstanding reserved amount).
+
+        Velocity counts every authorization issued — released ones included:
+        a voided payment still consumed an authorization slot, so rapid
+        authorize-and-void cycling cannot evade the rate limit. Budget counts
+        only outstanding (unreleased) reservations.
+        """
         with self._lock:
             rows = [r for r in self._records.get(mandate_id, []) if r[0] >= since]
-        return len(rows), sum(a for _, a, _ in rows)
+        return len(rows), sum(a for _, a, _, rel in rows if not rel)
 
     def get_tx(self, tx_id: str) -> TxRecord | None:
         with self._lock:
@@ -130,11 +139,14 @@ class SQLiteStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS spend "
-            "(mandate_id TEXT, ts REAL, amount INTEGER, tx_id TEXT)"
+            "(mandate_id TEXT, ts REAL, amount INTEGER, tx_id TEXT, "
+            "released INTEGER NOT NULL DEFAULT 0)"
         )
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(spend)")}
         if "tx_id" not in cols:  # migrate a pre-0.4 store
             self._conn.execute("ALTER TABLE spend ADD COLUMN tx_id TEXT")
+        if "released" not in cols:  # migrate a pre-0.4.2 store
+            self._conn.execute("ALTER TABLE spend ADD COLUMN released INTEGER NOT NULL DEFAULT 0")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_spend ON spend(mandate_id, ts)")
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS txs (tx_id TEXT PRIMARY KEY, mandate_id TEXT, "
@@ -145,9 +157,13 @@ class SQLiteStore:
             "CREATE TABLE IF NOT EXISTS evidence ("
             "seq INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, tx_id TEXT, "
             "mandate_id TEXT, agent TEXT, payee TEXT, amount INTEGER, "
-            "allowed INTEGER, check_id TEXT, ts REAL, prev_hash TEXT, hash TEXT, "
-            "detail TEXT, signature TEXT)"
+            "currency TEXT, allowed INTEGER, check_id TEXT, status TEXT, "
+            "ts REAL, prev_hash TEXT, hash TEXT, detail TEXT, signature TEXT)"
         )
+        ecols = {r[1] for r in self._conn.execute("PRAGMA table_info(evidence)")}
+        for col in ("currency", "status"):  # migrate a pre-0.4.2 store
+            if col not in ecols:
+                self._conn.execute(f"ALTER TABLE evidence ADD COLUMN {col} TEXT")
         self._lock = threading.RLock()
         self._depth = 0
 
@@ -172,19 +188,28 @@ class SQLiteStore:
     def record(self, mandate_id: str, timestamp: float, amount: int, tx_id: str) -> None:
         with self._lock:
             self._conn.execute(
-                "INSERT INTO spend VALUES (?, ?, ?, ?)", (mandate_id, timestamp, amount, tx_id)
+                "INSERT INTO spend (mandate_id, ts, amount, tx_id) VALUES (?, ?, ?, ?)",
+                (mandate_id, timestamp, amount, tx_id),
             )
 
     def release(self, mandate_id: str, tx_id: str) -> None:
         with self._lock:
             self._conn.execute(
-                "DELETE FROM spend WHERE mandate_id = ? AND tx_id = ?", (mandate_id, tx_id)
+                "UPDATE spend SET released = 1 WHERE mandate_id = ? AND tx_id = ?",
+                (mandate_id, tx_id),
             )
 
     def spend(self, mandate_id: str, since: float) -> tuple[int, int]:
+        """(issued authorizations in window, outstanding reserved amount).
+
+        Velocity counts every authorization issued — released ones included
+        (MMF §5.1: a voided payment still consumed an authorization slot);
+        budget counts only unreleased reservations.
+        """
         with self._lock:
             count, total = self._conn.execute(
-                "SELECT COUNT(*), COALESCE(SUM(amount), 0) FROM spend "
+                "SELECT COUNT(*), COALESCE(SUM(CASE WHEN released = 0 "
+                "THEN amount ELSE 0 END), 0) FROM spend "
                 "WHERE mandate_id = ? AND ts >= ?",
                 (mandate_id, since),
             ).fetchone()
@@ -227,8 +252,9 @@ class SQLiteStore:
         with self._lock:
             self._conn.execute(
                 "INSERT INTO evidence (event, tx_id, mandate_id, agent, payee, "
-                "amount, allowed, check_id, ts, prev_hash, hash, detail, signature) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "amount, currency, allowed, check_id, status, ts, prev_hash, "
+                "hash, detail, signature) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     record.event,
                     record.tx_id,
@@ -236,8 +262,10 @@ class SQLiteStore:
                     record.agent,
                     record.payee,
                     record.amount,
+                    record.currency,
                     int(record.allowed),
                     record.check,
+                    record.status,
                     record.timestamp,
                     record.prev_hash,
                     record.hash,
@@ -252,8 +280,9 @@ class SQLiteStore:
 
         with self._lock:
             rows = self._conn.execute(
-                "SELECT event, tx_id, mandate_id, agent, payee, amount, allowed, "
-                "check_id, ts, prev_hash, detail, signature FROM evidence ORDER BY seq"
+                "SELECT event, tx_id, mandate_id, agent, payee, amount, currency, "
+                "allowed, check_id, status, ts, prev_hash, detail, signature "
+                "FROM evidence ORDER BY seq"
             ).fetchall()
         return [
             EvidenceRecord(
@@ -261,14 +290,16 @@ class SQLiteStore:
                 agent=r[3],
                 payee=r[4],
                 amount=r[5],
-                allowed=bool(r[6]),
-                check=r[7],
-                timestamp=r[8],
-                prev_hash=r[9],
-                detail=r[10] or "",
+                currency=r[6] or "",
+                allowed=bool(r[7]),
+                check=r[8],
+                status=r[9] or "",
+                timestamp=r[10],
+                prev_hash=r[11],
+                detail=r[12] or "",
                 tx_id=r[1],
                 event=r[0],
-                signature=r[11] or "",
+                signature=r[13] or "",
             )
             for r in rows
         ]

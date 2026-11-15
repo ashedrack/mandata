@@ -189,7 +189,7 @@ def main():
             expires_in_days=7,
             velocity_limit=2,
             total_budget=to_minor("100", "GBP"),
-            budget_window_days=7,
+            budget_window_days=30,  # window ≥ parent's: shorter cycles the allowance faster
         ),
     )
     print(f"   delegated stricter mandate -> {scout.agent}\n")

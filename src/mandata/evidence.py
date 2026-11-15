@@ -63,6 +63,8 @@ class EvidenceLog:
         detail: str = "",
         tx_id: str = "",
         event: str = "DECISION",
+        currency: str = "",
+        status: str = "",
     ) -> EvidenceRecord:
         if event not in EVENTS:
             raise ValueError(f"unknown evidence event {event!r}")
@@ -79,6 +81,8 @@ class EvidenceLog:
                 detail=detail,
                 tx_id=tx_id,
                 event=event,
+                currency=currency,
+                status=status,
             )
             if self._signing_key is not None:
                 sig = self._signing_key.sign(record.hash.encode()).signature.hex()

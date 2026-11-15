@@ -141,6 +141,8 @@ def enforce(
             detail=detail,
             tx_id=tx_id,
             event=event,
+            currency=currency or "",
+            status=status,
         )
 
     decision = Decision(
@@ -197,74 +199,53 @@ def claim(
     ledger = store or mandate._state
     with _serialized(chain, store):
         tx = ledger.get_tx(tx_id)
+        err = None
         if tx is None or tx.mandate_id != mandate.mandate_id:
-            raise LifecycleError(f"unknown transaction {tx_id} for mandate {mandate.mandate_id}")
-        if tx.status != AUTHORIZED:
-            raise LifecycleError(f"cannot claim {tx_id}: status is {tx.status}, not AUTHORIZED")
-        if (tx.payee, tx.amount, tx.currency) != (payee, amount, currency):
-            raise LifecycleError(
+            err = f"unknown transaction {tx_id} for mandate {mandate.mandate_id}"
+        elif tx.status != AUTHORIZED:
+            err = f"cannot claim {tx_id}: status is {tx.status}, not AUTHORIZED"
+        elif (tx.payee, tx.amount, tx.currency) != (payee, amount, currency):
+            err = (
                 f"instruction ({payee!r}, {amount!r}, {currency!r}) does not bind to "
                 f"authorized transaction {tx_id} ({tx.payee!r}, {tx.amount!r}, {tx.currency!r})"
             )
-        tx = dataclasses.replace(tx, status=CLAIMED)
-        ledger.put_tx(tx)
-        log.append(
-            mandate_id=mandate.mandate_id,
-            agent=mandate.agent,
-            payee=tx.payee,
-            amount=tx.amount,
-            allowed=True,
-            check=tx.check,
-            timestamp=at,
-            detail=f"{tx_id} claimed for dispatch",
-            tx_id=tx_id,
-            event="CLAIM",
-        )
-    return tx
-
-
-def unclaim(
-    mandate: Mandate,
-    tx_id: str,
-    evidence_log: EvidenceLog | None = None,
-    store=None,
-    at: float | None = None,
-    clock: Callable[[], float] = time.time,
-) -> TxRecord:
-    """Release a CLAIMED transaction back to AUTHORIZED (operator recovery).
-
-    Use only when it is certain the rail was never invoked; if the rail
-    outcome is unknown, the transaction MUST stay CLAIMED (fail-safe: an
-    unreleased reservation costs budget, a double-dispatch costs money).
-    """
-    at = clock() if at is None else at
-    log = evidence_log or _DEFAULT_LOG
-    chain, chain_error = mandate.resolve_chain()
-    if chain_error is not None:
-        raise LifecycleError(chain_error)
-    ledger = store or mandate._state
-    with _serialized(chain, store):
-        tx = ledger.get_tx(tx_id)
-        if tx is None or tx.mandate_id != mandate.mandate_id:
-            raise LifecycleError(f"unknown transaction {tx_id} for mandate {mandate.mandate_id}")
-        if tx.status == AUTHORIZED:
-            return tx
-        if tx.status != CLAIMED:
-            raise LifecycleError(f"cannot unclaim {tx_id}: status is {tx.status}")
-        tx = dataclasses.replace(tx, status=AUTHORIZED)
-        ledger.put_tx(tx)
-        log.append(
-            mandate_id=mandate.mandate_id,
-            agent=mandate.agent,
-            payee=tx.payee,
-            amount=tx.amount,
-            allowed=True,
-            check=tx.check,
-            timestamp=at,
-            detail=f"{tx_id} released before dispatch",
-            tx_id=tx_id,
-            event="UNCLAIM",
-        )
+        if err is not None:
+            # A rejected claim is security evidence: a binding mismatch is
+            # exactly the T6 substitution signal, and a duplicate claim is
+            # the double-dispatch attempt the slot exists to stop.
+            log.append(
+                mandate_id=mandate.mandate_id,
+                agent=mandate.agent,
+                payee=payee,
+                amount=amount if is_minor_amount(amount) else None,
+                allowed=False,
+                check="CLAIM",
+                timestamp=at,
+                detail=err,
+                tx_id=tx_id,
+                event="REJECTED",
+                currency=currency or "",
+                status=tx.status if tx is not None else "",
+            )
+        else:
+            tx = dataclasses.replace(tx, status=CLAIMED)
+            ledger.put_tx(tx)
+            log.append(
+                mandate_id=mandate.mandate_id,
+                agent=mandate.agent,
+                payee=tx.payee,
+                amount=tx.amount,
+                allowed=True,
+                check=tx.check,
+                timestamp=at,
+                detail=f"{tx_id} claimed for dispatch",
+                tx_id=tx_id,
+                event="CLAIM",
+                currency=tx.currency or "",
+                status=CLAIMED,
+            )
+    if err is not None:
+        raise LifecycleError(err)
     return tx
 
 
@@ -294,9 +275,15 @@ def void(
 ) -> TxRecord:
     """Release an AUTHORIZED or CLAIMED transaction that will never settle.
 
-    Its reserved amount and velocity slot are returned to every mandate in
-    the chain. Idempotent for already-voided transactions. A SETTLED
-    transaction cannot be voided: refunds are a rail concern (MMF §8).
+    Its reserved amount is returned to every mandate in the chain; the
+    velocity slot is retained — velocity counts authorizations issued, so an
+    authorize-and-void cycle cannot evade the rate limit (MMF §5.1). This is
+    also the recovery path for a CLAIMED transaction the operator confirms
+    was never submitted to the rail: the claim slot is permanently consumed,
+    so the retry must use a new ``tx_id``.
+
+    Idempotent for already-voided transactions. A SETTLED transaction cannot
+    be voided: refunds are a rail concern (MMF §8).
     """
     return _transition(mandate, tx_id, VOIDED, evidence_log, store, at, clock)
 
@@ -310,29 +297,53 @@ def _transition(mandate, tx_id, target, evidence_log, store, at, clock) -> TxRec
     ledger = store or mandate._state
     with _serialized(chain, store):
         tx = ledger.get_tx(tx_id)
+        err = None
         if tx is None or tx.mandate_id != mandate.mandate_id:
-            raise LifecycleError(f"unknown transaction {tx_id} for mandate {mandate.mandate_id}")
-        if tx.status == target:
-            return tx
-        if tx.status not in (AUTHORIZED, CLAIMED):
-            raise LifecycleError(f"cannot move {tx_id} from {tx.status} to {target}")
-        if target == VOIDED:
-            for node in chain:
-                (store or node._state).release(node.mandate_id, tx_id)
-        tx = dataclasses.replace(tx, status=target)
-        ledger.put_tx(tx)
-        log.append(
-            mandate_id=mandate.mandate_id,
-            agent=mandate.agent,
-            payee=tx.payee,
-            amount=tx.amount,
-            allowed=True,
-            check=tx.check,
-            timestamp=at,
-            detail=f"{tx_id} {target.lower()}",
-            tx_id=tx_id,
-            event="SETTLE" if target == SETTLED else "VOID",
-        )
+            err = f"unknown transaction {tx_id} for mandate {mandate.mandate_id}"
+        elif tx.status == target:
+            return tx  # idempotent repeat: unchanged, no evidence
+        elif tx.status not in (AUTHORIZED, CLAIMED):
+            err = f"cannot move {tx_id} from {tx.status} to {target}"
+        if err is not None:
+            # Rejected transitions are security evidence too (R6): a settle
+            # attempt on a denied or voided transaction is exactly the kind
+            # of event an audit exists to catch.
+            log.append(
+                mandate_id=mandate.mandate_id,
+                agent=mandate.agent,
+                payee=tx.payee if tx is not None else "",
+                amount=tx.amount if tx is not None else None,
+                allowed=False,
+                check="SETTLE" if target == SETTLED else "VOID",
+                timestamp=at,
+                detail=err,
+                tx_id=tx_id,
+                event="REJECTED",
+                currency=tx.currency if tx is not None else "",
+                status=tx.status if tx is not None else "",
+            )
+        else:
+            if target == VOIDED:
+                for node in chain:
+                    (store or node._state).release(node.mandate_id, tx_id)
+            tx = dataclasses.replace(tx, status=target)
+            ledger.put_tx(tx)
+            log.append(
+                mandate_id=mandate.mandate_id,
+                agent=mandate.agent,
+                payee=tx.payee,
+                amount=tx.amount,
+                allowed=True,
+                check=tx.check,
+                timestamp=at,
+                detail=f"{tx_id} {target.lower()}",
+                tx_id=tx_id,
+                event="SETTLE" if target == SETTLED else "VOID",
+                currency=tx.currency or "",
+                status=target,
+            )
+    if err is not None:
+        raise LifecycleError(err)
     return tx
 
 

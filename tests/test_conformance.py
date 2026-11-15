@@ -18,7 +18,6 @@ from mandata import (
     delegate,
     enforce,
     settle,
-    unclaim,
     void,
 )
 from mandata.models import EvidenceRecord
@@ -160,15 +159,15 @@ def test_lifecycle_vector(v):
                     evidence_log=log,
                     at=step["at"],
                 )
-            elif "unclaim" in step:
-                tx = unclaim(m, step["unclaim"], evidence_log=log, at=step["at"])
             elif "settle" in step:
                 tx = settle(m, step["settle"], evidence_log=log, at=step["at"])
             else:
                 tx = void(m, step["void"], evidence_log=log, at=step["at"])
         except LifecycleError:
             assert expect.get("error"), f"{v['id']}: unexpected rejection"
-            assert len(log.records) == before  # rejected transitions leave no evidence
+            # rejected transitions append exactly one REJECTED evidence record
+            assert len(log.records) == before + 1
+            assert log.records[-1].event == "REJECTED"
         else:
             assert not expect.get("error"), f"{v['id']}: expected rejection"
             assert tx.status == expect["status"]

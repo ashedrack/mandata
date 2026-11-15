@@ -80,7 +80,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [x] **v0.3** — [MMF-v0.2](spec/mmf-v0.2.md): credential-bound gate, chain-wide delegation enforcement, fail-closed registry, canonical evidence hashing, 43 conformance vectors
 - [x] **v0.4** — [MMF-v0.3](spec/mmf-v0.3.md): integer minor-unit amounts, `tx_id` idempotency, authorize/settle/void lifecycle, payee binding in adapters, gate-signed evidence, cross-process serializable SQLite store, 58 conformance vectors
 - [x] **v0.4.1** — [MMF-v0.3.1](spec/mmf-v0.3.1.md): mandatory transaction currency, `INVALID_CHAIN` for unresolvable/cyclic chains, chain-wide credential verification, `claim()`/`unclaim()` single-dispatch lifecycle (AUTHORIZED→CLAIMED→SETTLED), atomic durable evidence in the state transaction, byte-level canonical serialization, 64 conformance vectors
-- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.1 conformant)
+- [x] **v0.4.2** — [MMF-v0.3.2](spec/mmf-v0.3.2.md): permanently-consumed claim slot (no re-claim; recovery = void + new tx_id), `REJECTED` evidence for failed lifecycle transitions, velocity counts issued authorizations (void refunds budget only), budget-window attenuation, canonical evidence v2 (currency + status hashed, NFC), 65 conformance vectors
+- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.2 conformant)
 
 ## Research
 
