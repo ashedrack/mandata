@@ -6,7 +6,6 @@ import hashlib
 import math
 import threading
 import time
-import unicodedata
 import uuid
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -42,9 +41,11 @@ def lp_field(value: str) -> str:
 
     Self-delimiting, so any field value (including ``|``) is unambiguous —
     MMF §5.6's canonical form for evidence, credentials and mandate hashing.
+    The value's exact Unicode scalar sequence is preserved — no NFC or other
+    normalization — so an evidence record is a faithful byte representation
+    of the request the gate evaluated, matching §5.3's exact request equality.
     """
-    v = unicodedata.normalize("NFC", value)
-    return f"{len(v.encode('utf-8'))}:{v}"
+    return f"{len(value.encode('utf-8'))}:{value}"
 
 
 def lp_fields(*values: str) -> str:

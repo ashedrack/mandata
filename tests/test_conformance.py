@@ -197,14 +197,20 @@ def test_evidence_hash_vector(v):
 
 @pytest.mark.parametrize("v", CREDENTIAL, ids=[v["id"] for v in CREDENTIAL])
 def test_credential_signature_vector(v):
-    """Golden credential vector: canonical bytes, bounds_hash and the
-    deterministic Ed25519 signature must all reproduce exactly (MMF §7)."""
+    """Golden credential vectors: canonical bytes, bounds_hash and the
+    deterministic Ed25519 signature must reproduce exactly for C01, and every
+    negative credential (C02+) MUST fail verification (MMF §7)."""
     from nacl.signing import SigningKey
 
-    from mandata.credentials import _payload, bounds_hash
+    from mandata.credentials import (
+        Credential,
+        _payload,
+        bounds_hash,
+        verify_credential,
+    )
     from mandata.models import Bounds, Mandate, canonical_number, lp_fields
 
-    i = v["inputs"]
+    i = v.get("inputs") or v["mandate_inputs"]
     b = i["bounds"]
     bounds = Bounds(
         max_amount=b["max_amount"], currency=b["currency"],
@@ -228,6 +234,13 @@ def test_credential_signature_vector(v):
         str(bounds.budget_window_days),
     ).encode()
     exp = v["expected"]
+    if "credential" in v:  # negative vectors: verification MUST fail as specified
+        cred = Credential(**v["credential"])
+        ok, _reason = verify_credential(
+            cred, m, v["principal_public_key_hex"], at=m.issued_at + 100
+        )
+        assert ok is exp["valid"], f"{v['id']}: expected valid={exp['valid']}"
+        return
     assert bounds_payload.hex() == exp["bounds_payload_hex"]
     assert bounds_hash(m) == exp["bounds_hash"]
     payload = _payload(m.mandate_id, m.agent, exp["bounds_hash"], m.expires_at)
