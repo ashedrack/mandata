@@ -84,7 +84,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [x] **v0.4.3** — [MMF-v0.3.3](spec/mmf-v0.3.3.md): `void` of a CLAIMED transaction requires `confirmed_rail_cancelled` (uncertain in-flight stays CLAIMED), serialized ledger-first ordering + `TX_CONFLICT` evidence-only rule, mediation-scoped claim guarantee, REJECTED records carry the attempted instruction, byte-level timestamp rule, per-gate evidence chain scope — 66 vectors
 - [x] **v0.4.4** — [MMF-v0.3.4](spec/mmf-v0.3.4.md): canonical evidence v3 — length-prefixed fields (any value encodable), integer-millisecond timestamps, hashed `REFERENCE` provenance; `void` of a CLAIMED transaction requires a `cancellation` reference; checked arithmetic on accumulated totals
 - [x] **v0.4.5** — [MMF-v0.3.5](spec/mmf-v0.3.5.md): three-level dispatch guarantee formalized (claim / trusted dispatcher / rail), normative evidence serialization table (types, nulls, NFC, encodings), evidence obligations scoped to completed durably-committed evaluations
-- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.5 conformant)
+- [x] **v0.4.6** — [MMF-v0.3.6](spec/mmf-v0.3.6.md): revocation re-verified at `claim` (a revoked mandate's unclaimed authorization cannot be dispatched); per-state revocation policy; principal-authorized delegation model stated; exact unnormalized request equality
+- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.6 conformant)
 
 ## Research
 

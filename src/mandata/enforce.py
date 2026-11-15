@@ -172,6 +172,7 @@ def claim(
     store=None,
     at: float | None = None,
     clock: Callable[[], float] = time.time,
+    registry=None,
 ) -> TxRecord:
     """Atomically claim an AUTHORIZED transaction for dispatch (MMF §5.5).
 
@@ -186,6 +187,12 @@ def claim(
     This is the settlement-half of idempotency: ``enforce()`` guarantees a
     request is not authorized twice; ``claim()`` guarantees an authorization
     is not dispatched twice.
+
+    Revocation is re-verified at claim time (MMF §5.4): an authorization
+    granted before a mandate was revoked MUST NOT be dispatched afterward —
+    the kill switch has to reach the dispatch point, not just new
+    evaluations. ``settle`` and ``void`` are unaffected: they record rail
+    facts, not grant new authority.
 
     Raises LifecycleError for unknown, denied, already claimed, settled or
     voided transactions, or when the instruction does not match the stored
@@ -209,6 +216,20 @@ def claim(
                 f"instruction ({payee!r}, {amount!r}, {currency!r}) does not bind to "
                 f"authorized transaction {tx_id} ({tx.payee!r}, {tx.amount!r}, {tx.currency!r})"
             )
+        else:
+            for node in chain:
+                if node.revoked:
+                    err = f"{_label(node, mandate)} revoked — authorization cannot be dispatched"
+                    break
+            if err is None and registry is not None:
+                for node in chain:
+                    try:
+                        if registry.is_revoked(node.mandate_id):
+                            err = f"{_label(node, mandate)} revoked (registry) — cannot dispatch"
+                            break
+                    except Exception as exc:  # noqa: BLE001 — fail closed on registry faults
+                        err = f"revocation registry unavailable ({exc.__class__.__name__})"
+                        break
         if err is not None:
             # A rejected claim is security evidence: a binding mismatch is
             # exactly the T6 substitution signal, and a duplicate claim is

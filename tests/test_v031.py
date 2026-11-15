@@ -357,3 +357,39 @@ def test_child_budget_window_must_not_cycle_faster_than_parent():
         parent, "s", Bounds(max_amount=100, total_budget=100, budget_window_days=60), at=0
     )
     assert ok.parent_mandate_id == parent.mandate_id
+
+
+def test_claim_after_revocation_is_rejected():
+    """MMF §5.4: revocation kills undispatched authorizations at claim time."""
+    m = Mandate(
+        mandate_id="m",
+        agent="a",
+        principal="p",
+        bounds=Bounds(max_amount=100, currency="GBP"),
+    )
+    log = EvidenceLog()
+    d = enforce(m, "x", 10, "GBP", tx_id="t1", at=1000, evidence_log=log)
+    assert d.allowed
+    m.revoked = True
+    with pytest.raises(LifecycleError):
+        claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1001)
+    assert [r.event for r in log.records] == ["DECISION", "REJECTED"]
+    # facts may still be recorded/released post-revocation
+    assert void(m, "t1", evidence_log=log, at=1002).status == VOIDED
+
+
+def test_claim_after_revocation_registry_fails_closed():
+    class Reg:
+        def is_revoked(self, mid):
+            return mid == "m"
+
+    m = Mandate(
+        mandate_id="m",
+        agent="a",
+        principal="p",
+        bounds=Bounds(max_amount=100, currency="GBP"),
+    )
+    log = EvidenceLog()
+    enforce(m, "x", 10, "GBP", tx_id="t1", at=1000, evidence_log=log, registry=Reg())
+    with pytest.raises(LifecycleError):
+        claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1001, registry=Reg())
