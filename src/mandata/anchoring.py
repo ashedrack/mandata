@@ -41,6 +41,14 @@ def anchor(log: EvidenceLog, service_url: str, timeout: float = 5.0) -> Anchor:
     return Anchor(head_hash=log.head_hash, service_token=token, service_url=service_url)
 
 
-def verify_anchor(log: EvidenceLog, anchor_obj: Anchor, service_url: str) -> bool:
-    """Confirm the current chain head still matches the anchored proof."""
-    return log.head_hash == anchor_obj.head_hash
+def verify_anchor(log: EvidenceLog, anchor_obj: Anchor, service_url: str | None = None) -> bool:
+    """Confirm the chain is intact and still contains the anchored head.
+
+    Records appended after the anchor are allowed (the log keeps growing);
+    any rewrite or truncation at or before the anchored point fails. Records
+    after the most recent anchor remain protected only by the chain itself,
+    so anchor periodically. ``service_url`` is accepted for API compatibility;
+    validating ``service_token`` against the timestamping service is
+    service-specific and left to the caller.
+    """
+    return log.verify_chain(anchored_head=anchor_obj.head_hash)

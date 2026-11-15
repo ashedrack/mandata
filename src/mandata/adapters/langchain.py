@@ -84,8 +84,13 @@ def guard(
         )
         if not decision.allowed:
             if raise_on_deny:
-                raise PermissionError(f"mandate denied: {decision.reason}")
-            return {"denied": decision.reason, "allowed": False, "payee": str(payee)}
+                raise PermissionError(f"mandate denied [{decision.check}]: {decision.reason}")
+            return {
+                "denied": decision.reason,
+                "check": decision.check,
+                "allowed": False,
+                "payee": str(payee),
+            }
         return fn(*args, **kwargs)
 
     wrapper.__name__ = getattr(fn, "__name__", "guarded_tool")

@@ -44,7 +44,8 @@ mandate = Mandate(
 # At transaction time: deterministic enforcement BEFORE settlement
 decision = enforce(mandate, payee="store.example", amount=49.99)
 assert decision.allowed          # → True
-print(decision.evidence)         # → signed evidence record of the check
+print(decision.check)            # → "WITHIN" (normative MMF check ID)
+print(decision.evidence)         # → hash-chained evidence record of the check
 ```
 
 ## Architecture
@@ -67,10 +68,11 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 
 - [x] **v0.1** — Mandate model, bounds enforcement, evidence chain (Python)
 - [x] Credential signing (Ed25519) + verification API
-- [ ] Revocation registry (mandate kill-switch at transaction speed)
-- [ ] TypeScript implementation
-- [ ] AP2 / x402 adapter layer
-- [ ] Multi-hop delegation (agent → sub-agent mandate weakening)
+- [x] Revocation registry (mandate kill-switch at transaction speed)
+- [x] AP2 / x402 / LangChain adapter layer
+- [x] Multi-hop delegation (agent → sub-agent mandate weakening)
+- [x] **v0.3** — [MMF-v0.2](spec/mmf-v0.2.md): credential-bound gate, chain-wide delegation enforcement, fail-closed registry, canonical evidence hashing, 43 conformance vectors
+- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.2 conformant)
 
 ## Research
 
