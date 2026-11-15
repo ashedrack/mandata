@@ -265,8 +265,8 @@ def test_rejected_lifecycle_transitions_are_security_evidence():
         claim(m, "t1", "evil", 10, "GBP", evidence_log=log, at=1000)
     new = log.records[n:]
     assert [r.event for r in new] == ["REJECTED", "REJECTED"]
-    assert new[0].check == "SETTLE" and not new[0].allowed
-    assert new[1].check == "CLAIM" and new[1].payee == "evil"
+    assert new[0].check == "SETTLE:UNKNOWN_TX" and not new[0].allowed
+    assert new[1].check == "CLAIM:BINDING" and new[1].payee == "evil"
     assert log.verify_chain()  # rejections chain like everything else
 
 

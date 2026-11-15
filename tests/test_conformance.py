@@ -27,6 +27,7 @@ CORE = json.loads((SPEC / "core.json").read_text())["vectors"]
 DELEGATION = json.loads((SPEC / "delegation.json").read_text())["vectors"]
 LIFECYCLE = json.loads((SPEC / "lifecycle.json").read_text())["vectors"]
 EVIDENCE = json.loads((SPEC / "evidence.json").read_text())["vectors"]
+CREDENTIAL = json.loads((SPEC / "credential.json").read_text())
 
 
 class UnavailableRegistry:
@@ -192,3 +193,45 @@ def test_evidence_hash_vector(v):
         assert rec.hash == expected["hash"]
         prev = rec.hash
     assert prev == v["head"]
+
+
+@pytest.mark.parametrize("v", CREDENTIAL, ids=[v["id"] for v in CREDENTIAL])
+def test_credential_signature_vector(v):
+    """Golden credential vector: canonical bytes, bounds_hash and the
+    deterministic Ed25519 signature must all reproduce exactly (MMF §7)."""
+    from nacl.signing import SigningKey
+
+    from mandata.credentials import _payload, bounds_hash
+    from mandata.models import Bounds, Mandate, canonical_number, lp_fields
+
+    i = v["inputs"]
+    b = i["bounds"]
+    bounds = Bounds(
+        max_amount=b["max_amount"], currency=b["currency"],
+        allowed_payees=b["allowed_payees"],
+        expires_in_days=b["expires_in_days"],
+        velocity_limit=b["velocity_limit"],
+        total_budget=b["total_budget"],
+        budget_window_days=b["budget_window_days"],
+    )
+    m = Mandate(
+        principal=i["principal"], agent=i["agent"], bounds=bounds,
+        mandate_id=i["mandate_id"], issued_at=i["issued_at"],
+        parent_mandate_id=i["parent_mandate_id"] or None,
+    )
+    bounds_payload = lp_fields(
+        m.principal, canonical_number(m.issued_at), m.parent_mandate_id or "",
+        str(bounds.max_amount), bounds.currency,
+        ",".join(sorted(bounds.allowed_payees)),
+        str(bounds.expires_in_days), str(bounds.velocity_limit),
+        "" if bounds.total_budget is None else str(bounds.total_budget),
+        str(bounds.budget_window_days),
+    ).encode()
+    exp = v["expected"]
+    assert bounds_payload.hex() == exp["bounds_payload_hex"]
+    assert bounds_hash(m) == exp["bounds_hash"]
+    payload = _payload(m.mandate_id, m.agent, exp["bounds_hash"], m.expires_at)
+    assert payload.hex() == exp["payload_hex"]
+    sk = SigningKey(bytes.fromhex(v["seed_hex"]))
+    assert sk.verify_key.encode().hex() == v["public_key_hex"]
+    assert sk.sign(payload).signature.hex() == exp["signature"]

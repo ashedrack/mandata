@@ -75,7 +75,16 @@ def enforce(
     stored_amount = amount if is_minor_amount(amount) else None
 
     with _serialized(chain, store):
+        # The ledger lookup is the FIRST authoritative operation inside the
+        # store transaction (MMF §5.3). Chain resolution before the locks is
+        # pure — links are immutable once delegate() sets them — but we
+        # re-resolve inside the serialization and fail closed if the chain
+        # identity changed, so a replay can never be shadowed by graph edits.
         prior = ledger.get_tx(tx_id)
+        chain2, chain2_err2 = mandate.resolve_chain()
+        if [n.mandate_id for n in (chain2 or [])] != [n.mandate_id for n in chain]:
+            chain_error = chain_error or chain2_err2 or "delegation chain mutated during evaluation"
+            chain = chain2 or [mandate]
         replayed = False
         if prior is not None and prior.same_request(
             mandate.mandate_id, payee, stored_amount, currency
@@ -206,46 +215,55 @@ def claim(
     ledger = store or mandate._state
     with _serialized(chain, store):
         tx = ledger.get_tx(tx_id)
-        err = None
+        err = cause = None
         if tx is None or tx.mandate_id != mandate.mandate_id:
             err = f"unknown transaction {tx_id} for mandate {mandate.mandate_id}"
+            cause = "UNKNOWN_TX"
         elif tx.status != AUTHORIZED:
             err = f"cannot claim {tx_id}: status is {tx.status}, not AUTHORIZED"
+            cause = "STATUS"
         elif (tx.payee, tx.amount, tx.currency) != (payee, amount, currency):
             err = (
                 f"instruction ({payee!r}, {amount!r}, {currency!r}) does not bind to "
                 f"authorized transaction {tx_id} ({tx.payee!r}, {tx.amount!r}, {tx.currency!r})"
             )
+            cause = "BINDING"
         else:
             for node in chain:
                 if node.revoked:
                     err = f"{_label(node, mandate)} revoked — authorization cannot be dispatched"
+                    cause = "REVOKED"
                     break
             if err is None:
                 for node in chain:
                     if node.is_expired(at):
                         err = f"{_label(node, mandate)} expired — cannot dispatch"
+                        cause = "EXPIRED"
                         break
             if err is None and registry is not None:
                 for node in chain:
                     try:
                         if registry.is_revoked(node.mandate_id):
                             err = f"{_label(node, mandate)} revoked (registry) — cannot dispatch"
+                            cause = "REVOKED"
                             break
                     except Exception as exc:  # noqa: BLE001 — fail closed on registry faults
                         err = f"revocation registry unavailable ({exc.__class__.__name__})"
+                        cause = "REGISTRY"
                         break
         if err is not None:
             # A rejected claim is security evidence: a binding mismatch is
             # exactly the T6 substitution signal, and a duplicate claim is
             # the double-dispatch attempt the slot exists to stop.
+            # Normative cause: <OP>:<CAUSE> — two conforming implementations
+            # rejecting the same attempt produce identical records (MMF §5.6).
             log.append(
                 mandate_id=mandate.mandate_id,
                 agent=mandate.agent,
                 payee=payee,
                 amount=amount if is_minor_amount(amount) else None,
                 allowed=False,
-                check="CLAIM",
+                check=f"CLAIM:{cause}",
                 timestamp=at,
                 detail=err,
                 tx_id=tx_id,
@@ -335,19 +353,23 @@ def _transition(
     ledger = store or mandate._state
     with _serialized(chain, store):
         tx = ledger.get_tx(tx_id)
-        err = None
+        err = cause = None
+        op = "SETTLE" if target == SETTLED else "VOID"
         if tx is None or tx.mandate_id != mandate.mandate_id:
             err = f"unknown transaction {tx_id} for mandate {mandate.mandate_id}"
+            cause = "UNKNOWN_TX"
         elif tx.status == target:
             return tx  # idempotent repeat: unchanged, no evidence
         elif tx.status not in (AUTHORIZED, CLAIMED):
             err = f"cannot move {tx_id} from {tx.status} to {target}"
+            cause = "STATUS"
         elif target == VOIDED and tx.status == CLAIMED and not cancellation:
             err = (
                 f"cannot void claimed transaction {tx_id} without authoritative "
                 "confirmation the rail did not execute — an uncertain in-flight "
                 "outcome stays CLAIMED"
             )
+            cause = "CANCELLATION"
         if err is not None:
             # Rejected transitions are security evidence too (R6): a settle
             # attempt on a denied or voided transaction is exactly the kind
@@ -358,7 +380,7 @@ def _transition(
                 payee=tx.payee if tx is not None else "",
                 amount=tx.amount if tx is not None else None,
                 allowed=False,
-                check="SETTLE" if target == SETTLED else "VOID",
+                check=f"{op}:{cause}",
                 timestamp=at,
                 detail=err,
                 tx_id=tx_id,
