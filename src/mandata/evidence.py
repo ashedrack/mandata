@@ -65,6 +65,7 @@ class EvidenceLog:
         event: str = "DECISION",
         currency: str = "",
         status: str = "",
+        reference: str = "",
     ) -> EvidenceRecord:
         if event not in EVENTS:
             raise ValueError(f"unknown evidence event {event!r}")
@@ -79,6 +80,7 @@ class EvidenceLog:
                 timestamp=time.time() if timestamp is None else timestamp,
                 prev_hash=self.head_hash,
                 detail=detail,
+                reference=reference,
                 tx_id=tx_id,
                 event=event,
                 currency=currency,

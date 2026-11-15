@@ -158,7 +158,7 @@ class SQLiteStore:
             "seq INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, tx_id TEXT, "
             "mandate_id TEXT, agent TEXT, payee TEXT, amount INTEGER, "
             "currency TEXT, allowed INTEGER, check_id TEXT, status TEXT, "
-            "ts REAL, prev_hash TEXT, hash TEXT, detail TEXT, signature TEXT)"
+            "ts REAL, prev_hash TEXT, hash TEXT, detail TEXT, reference TEXT, signature TEXT)"
         )
         ecols = {r[1] for r in self._conn.execute("PRAGMA table_info(evidence)")}
         for col in ("currency", "status"):  # migrate a pre-0.4.2 store
@@ -253,8 +253,8 @@ class SQLiteStore:
             self._conn.execute(
                 "INSERT INTO evidence (event, tx_id, mandate_id, agent, payee, "
                 "amount, currency, allowed, check_id, status, ts, prev_hash, "
-                "hash, detail, signature) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "hash, detail, reference, signature) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     record.event,
                     record.tx_id,
@@ -270,6 +270,7 @@ class SQLiteStore:
                     record.prev_hash,
                     record.hash,
                     record.detail,
+                    record.reference,
                     record.signature,
                 ),
             )
@@ -281,7 +282,7 @@ class SQLiteStore:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT event, tx_id, mandate_id, agent, payee, amount, currency, "
-                "allowed, check_id, status, ts, prev_hash, detail, signature "
+                "allowed, check_id, status, ts, prev_hash, detail, reference, signature "
                 "FROM evidence ORDER BY seq"
             ).fetchall()
         return [
@@ -297,9 +298,10 @@ class SQLiteStore:
                 timestamp=r[10],
                 prev_hash=r[11],
                 detail=r[12] or "",
+                reference=r[13] or "",
                 tx_id=r[1],
                 event=r[0],
-                signature=r[13] or "",
+                signature=r[14] or "",
             )
             for r in rows
         ]

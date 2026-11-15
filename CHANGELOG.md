@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.4] — implements MMF-v0.3.4
+
+- **Canonical evidence v3 (breaking).** Fields serialize as `<UTF-8 byte length>:<value>` joined by `|` — self-delimiting, so any field value (including `|`) is encodable and malformed instructions can always be recorded. Chains produced by ≤0.4.3 do not verify under this version.
+- **Timestamps serialize as integer Unix milliseconds** (`floor(t×1000+0.5)`) — byte-identical across languages regardless of numeric type.
+- **New hashed `REFERENCE` field** carries normative provenance; `detail` (denial prose) stays advisory and unhashed.
+- **`void` on CLAIMED requires a `cancellation` reference** (replaces `confirmed_rail_cancelled`) — a non-empty identifier of the authoritative rail confirmation, hashed into the VOID record.
+- **Checked arithmetic** — an accumulated total that would exceed 2⁵³−1 denies `BUDGET` instead of overflowing.
+- 66 conformance vectors; 194 tests.
+
 ## [0.4.3] — implements MMF-v0.3.3
 
 - **`void` on a CLAIMED transaction requires `confirmed_rail_cancelled=True`** — an uncertain in-flight outcome stays CLAIMED; releasing budget on an unconfirmed void could let spend escape the budget. AUTHORIZED → VOIDED is unchanged.
