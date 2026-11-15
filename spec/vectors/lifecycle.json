@@ -908,6 +908,126 @@
         "REJECTED",
         "VOID"
       ]
+    },
+    {
+      "id": "L17",
+      "desc": "an unresolved claim that outlives the budget window keeps consuming budget: the new request is denied until the open claim is resolved",
+      "mandate": {
+        "bounds": {
+          "max_amount": 500,
+          "total_budget": 100,
+          "budget_window_days": 1
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "status": "CLAIMED"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount": 50,
+            "at": 173800,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "BUDGET"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "CLAIM",
+        "DECISION"
+      ]
+    },
+    {
+      "id": "L18",
+      "desc": "resolved (settled) spend ages out of the rolling window normally: budget is available again after the window passes",
+      "mandate": {
+        "bounds": {
+          "max_amount": 500,
+          "total_budget": 100,
+          "budget_window_days": 1
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "status": "CLAIMED"
+          }
+        },
+        {
+          "settle": "t1",
+          "at": 1002,
+          "expect": {
+            "status": "SETTLED"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount": 50,
+            "at": 173800,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "CLAIM",
+        "SETTLE",
+        "DECISION"
+      ]
     }
   ]
 }

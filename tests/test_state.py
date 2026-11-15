@@ -23,7 +23,8 @@ def test_budget_respects_window():
         bounds=Bounds(max_amount=1000, total_budget=100, budget_window_days=30),
     )
     past = time.time() - 31 * 86400
-    m.record(past, 90)
+    m.record(past, 90, tx_id="old-tx")
+    m._state.resolve(m.mandate_id, "old-tx")
     assert enforce(m, "store.example", 80, evidence_log=EvidenceLog(), currency="GBP").allowed
 
 
