@@ -86,7 +86,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [x] **v0.4.5** — [MMF-v0.3.5](spec/mmf-v0.3.5.md): three-level dispatch guarantee formalized (claim / trusted dispatcher / rail), normative evidence serialization table (types, nulls, NFC, encodings), evidence obligations scoped to completed durably-committed evaluations
 - [x] **v0.4.6** — [MMF-v0.3.6](spec/mmf-v0.3.6.md): revocation re-verified at `claim` (a revoked mandate's unclaimed authorization cannot be dispatched); per-state revocation policy; principal-authorized delegation model stated; exact unnormalized request equality
 - [x] **v0.4.7** — [MMF-v0.3.7](spec/mmf-v0.3.7.md): `claim` re-verifies revocation AND expiry chain-wide (linearization = claim commit); unresolved open reservations consume budget at any age (L17/L18); optional signed-evidence conformance profile; typed-value request equality — 68 vectors
-- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.7 conformant)
+- [x] **v0.4.8** — [MMF-v0.3.8](spec/mmf-v0.3.8.md): unified length-prefixed canonicalization for credentials + bounds_hash (delimiter-smuggling closed); `mandate_id` immutable-for-life + durable mandate preservation; timestamp edge cases; typed-equality integral rule
+- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.8 conformant)
 
 ## Research
 
