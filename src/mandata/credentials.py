@@ -30,12 +30,12 @@ def bounds_hash(mandate: Mandate) -> str:
             mandate.principal,
             canonical_number(mandate.issued_at),
             mandate.parent_mandate_id or "",
-            canonical_number(b.max_amount),
+            str(b.max_amount),
             b.currency,
             ",".join(sorted(b.allowed_payees)),
             str(b.expires_in_days),
             str(b.velocity_limit),
-            "" if b.total_budget is None else canonical_number(b.total_budget),
+            "" if b.total_budget is None else str(b.total_budget),
             str(b.budget_window_days),
         ]
     )

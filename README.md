@@ -26,26 +26,31 @@ pip install mandata
 ```
 
 ```python
-from mandata import Mandate, Bounds, enforce
+from mandata import Mandate, Bounds, enforce, settle, to_minor
 
-# A principal grants a bounded mandate to an agent
+# A principal grants a bounded mandate to an agent (amounts in minor units)
 mandate = Mandate(
     principal="user:alice",
     agent="agent:shopping-bot",
     bounds=Bounds(
-        max_amount=500.00,          # per transaction
+        max_amount=to_minor("500.00", "GBP"),  # 50000 pence per transaction
         currency="GBP",
         allowed_payees=["store.example"],
         expires_in_days=30,
-        velocity_limit=3,           # max transactions per day
+        velocity_limit=3,  # max authorizations per day
     ),
 )
 
-# At transaction time: deterministic enforcement BEFORE settlement
-decision = enforce(mandate, payee="store.example", amount=49.99)
-assert decision.allowed          # → True
-print(decision.check)            # → "WITHIN" (normative MMF check ID)
-print(decision.evidence)         # → hash-chained evidence record of the check
+# At transaction time: deterministic enforcement BEFORE settlement.
+# tx_id makes retries idempotent and links the authorization to settlement.
+decision = enforce(mandate, payee="store.example", amount=4999, tx_id="order-1")
+assert decision.allowed  # → True (status AUTHORIZED, amount reserved)
+print(decision.check)  # → "WITHIN" (normative MMF check ID)
+
+# Submit to the rail only an instruction that binds to the approval, then settle
+if decision.binds("store.example", 4999):
+    ...  # rail.pay(..., idempotency_key="order-1")
+    settle(mandate, "order-1")  # or void(mandate, "order-1") if it failed
 ```
 
 ## Architecture
@@ -72,7 +77,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [x] AP2 / x402 / LangChain adapter layer
 - [x] Multi-hop delegation (agent → sub-agent mandate weakening)
 - [x] **v0.3** — [MMF-v0.2](spec/mmf-v0.2.md): credential-bound gate, chain-wide delegation enforcement, fail-closed registry, canonical evidence hashing, 43 conformance vectors
-- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.2 conformant)
+- [x] **v0.4** — [MMF-v0.3](spec/mmf-v0.3.md): integer minor-unit amounts, `tx_id` idempotency, authorize/settle/void lifecycle, payee binding in adapters, gate-signed evidence, cross-process serializable SQLite store, 58 conformance vectors
+- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3 conformant)
 
 ## Research
 

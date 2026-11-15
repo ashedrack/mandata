@@ -5,7 +5,7 @@ from mandata.adapters.langchain import guard
 
 
 def test_guard_allows_within_bounds():
-    m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100, allowed_payees=["tesco"]))
+    m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=10000, allowed_payees=["tesco"]))
     calls = []
 
     def pay(payee: str, amount: float) -> str:
@@ -40,7 +40,7 @@ def test_guard_denial_written_to_evidence():
 
 
 def test_guard_positional_args():
-    m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100))
+    m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=10000))
     safe = guard(m, lambda payee, amount: "ok", evidence_log=EvidenceLog())
     assert safe("x", 10) == "ok"
 

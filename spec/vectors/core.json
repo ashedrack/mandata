@@ -1,10 +1,10 @@
 {
-  "version": "mmf-v0.2",
-  "description": "Core conformance vectors - one per check plus boundary and ordering cases. prior_txns seed state before evaluation (allowed records only). registry.revoked lists mandate_ids revoked in an attached registry; registry.unavailable=true means every registry lookup fails.",
+  "version": "mmf-v0.3",
+  "description": "Core conformance vectors (amounts are integers in minor units, MMF-v0.3 §3.1) - one per check plus boundary and ordering cases. prior_txns seed state before evaluation (allowed records only). registry.revoked lists mandate_ids revoked in an attached registry; registry.unavailable=true means every registry lookup fails.",
   "vectors": [
     {"id": "V01", "desc": "within bounds",
-     "mandate": {"bounds": {"max_amount": 500, "currency": "GBP", "allowed_payees": ["tesco.com"], "expires_in_days": 30, "velocity_limit": 0}},
-     "tx": {"payee": "tesco.com", "amount": 49.99, "currency": "GBP", "at": 1000},
+     "mandate": {"bounds": {"max_amount": 50000, "currency": "GBP", "allowed_payees": ["tesco.com"], "expires_in_days": 30, "velocity_limit": 0}},
+     "tx": {"payee": "tesco.com", "amount": 4999, "currency": "GBP", "at": 1000},
      "expect": {"allowed": true, "check": "WITHIN"}},
     {"id": "V02", "desc": "locally revoked",
      "mandate": {"revoked": true, "bounds": {"max_amount": 500}},
@@ -20,7 +20,7 @@
      "expect": {"allowed": false, "check": "NON_POSITIVE"}},
     {"id": "V05", "desc": "amount over cap",
      "mandate": {"bounds": {"max_amount": 500}},
-     "tx": {"payee": "x", "amount": 500.01, "at": 1000},
+     "tx": {"payee": "x", "amount": 501, "at": 1000},
      "expect": {"allowed": false, "check": "CAP_EXCEEDED"}},
     {"id": "V06", "desc": "amount exactly at cap — boundary allowed",
      "mandate": {"bounds": {"max_amount": 500}},
@@ -120,6 +120,18 @@
      "tx": {"payee": "x", "amount": 500, "at": 1000},
      "expect": {"allowed": false, "check": "CAP_EXCEEDED"},
      "then_tx": {"payee": "x", "amount": 10, "at": 1001},
-     "then_expect": {"allowed": true, "check": "WITHIN"}}
+     "then_expect": {"allowed": true, "check": "WITHIN"}},
+    {"id": "V27", "desc": "fractional amount is not a minor-unit integer",
+     "mandate": {"bounds": {"max_amount": 50000}},
+     "tx": {"payee": "x", "amount": 49.99, "at": 1000},
+     "expect": {"allowed": false, "check": "NON_POSITIVE"}},
+    {"id": "V28", "desc": "amount above 2^53-1 is outside the interoperable integer range",
+     "mandate": {"bounds": {"max_amount": 9007199254740991}},
+     "tx": {"payee": "x", "amount": 9007199254740992, "at": 1000},
+     "expect": {"allowed": false, "check": "NON_POSITIVE"}},
+    {"id": "V29", "desc": "decimal string amount is not accepted on the wire",
+     "mandate": {"bounds": {"max_amount": 50000}},
+     "tx": {"payee": "x", "amount": "10", "at": 1000},
+     "expect": {"allowed": false, "check": "NON_POSITIVE"}}
   ]
 }

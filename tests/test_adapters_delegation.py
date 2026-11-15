@@ -7,7 +7,7 @@ from mandata.adapters import ap2, x402
 def test_x402_adapter_builds_mandate():
     req = {"maxAmountRequired": "50", "asset": "usdc", "payTo": "merchant.example"}
     m = x402.from_payment_requirements(req, "u", "a")
-    assert m.bounds.max_amount == 50.0
+    assert m.bounds.max_amount == 50
     assert m.bounds.currency == "USDC"
     assert m.bounds.allowed_payees == ["merchant.example"]
 
@@ -22,7 +22,7 @@ def test_ap2_adapter_builds_mandate():
         }
     }
     m = ap2.from_intent_mandate(intent, "u", "a")
-    assert m.bounds.max_amount == 200.0
+    assert m.bounds.max_amount == 20000  # AP2 values are major units: £200 = 20000p
     assert m.bounds.allowed_payees == ["tesco"]
 
 
@@ -32,7 +32,7 @@ def test_delegation_stricter_child_allowed():
     )
     child = delegate(parent, "a-sub", Bounds(max_amount=50, allowed_payees=["tesco"]))
     assert child.parent_mandate_id == parent.mandate_id
-    assert enforce(child, "tesco", 40.0, evidence_log=EvidenceLog()).allowed
+    assert enforce(child, "tesco", 40, evidence_log=EvidenceLog()).allowed
 
 
 def test_delegation_rejects_looser_bounds():

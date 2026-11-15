@@ -1,4 +1,4 @@
-"""Regression tests for the v0.3.0 hardening — each maps to a claim in the MMF paper."""
+"""Regression tests for the v0.3 hardening — each maps to a claim in the MMF paper."""
 
 import hashlib
 import threading
@@ -19,8 +19,11 @@ def mk(**kw) -> Mandate:
 # --- fail-safe defaults -------------------------------------------------------
 
 
-@pytest.mark.parametrize("amount", [float("nan"), float("inf"), -float("inf"), "10", None])
+@pytest.mark.parametrize(
+    "amount", [float("nan"), float("inf"), -float("inf"), "10", None, 10.0, 49.99, True, 0, -5]
+)
 def test_non_finite_or_non_numeric_amount_denied(amount):
+    """Only positive integers in minor units pass: floats (even 10.0) never do."""
     log = EvidenceLog()
     d = enforce(mk(total_budget=50), "x", amount, evidence_log=log)
     assert not d.allowed and d.check == "NON_POSITIVE"
@@ -32,6 +35,8 @@ def test_non_finite_or_non_numeric_amount_denied(amount):
     [
         {"max_amount": 0},
         {"max_amount": float("nan")},
+        {"max_amount": 10.0},
+        {"max_amount": 10, "total_budget": 50.5},
         {"max_amount": 10, "expires_in_days": 0},
         {"max_amount": 10, "velocity_limit": -1},
         {"max_amount": 10, "total_budget": 0},
@@ -50,7 +55,7 @@ def test_unreachable_registry_denies_and_records_evidence():
             raise ConnectionError("timeout")
 
     log = EvidenceLog()
-    d = enforce(mk(), "x", 10.0, evidence_log=log, registry=Down())
+    d = enforce(mk(), "x", 10, evidence_log=log, registry=Down())
     assert not d.allowed and d.check == "REVOKED_REGISTRY"
     assert "unavailable" in d.reason
     assert len(log.records) == 1 and log.records[0].check == "REVOKED_REGISTRY"
@@ -58,14 +63,14 @@ def test_unreachable_registry_denies_and_records_evidence():
 
 def test_at_zero_is_honoured_not_replaced_by_wall_clock():
     m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100), issued_at=0)
-    d = enforce(m, "x", 1.0, at=0, evidence_log=EvidenceLog())
+    d = enforce(m, "x", 1, at=0, evidence_log=EvidenceLog())
     assert d.allowed and d.evidence.timestamp == 0
 
 
 def test_gate_clock_is_authoritative_when_at_omitted():
     m = Mandate(principal="u", agent="a", bounds=Bounds(max_amount=100, expires_in_days=1))
     future = m.expires_at + 1
-    d = enforce(m, "x", 1.0, evidence_log=EvidenceLog(), clock=lambda: future)
+    d = enforce(m, "x", 1, evidence_log=EvidenceLog(), clock=lambda: future)
     assert d.check == "EXPIRED"
 
 
@@ -73,7 +78,7 @@ def test_gate_clock_is_authoritative_when_at_omitted():
 
 
 def test_decision_and_evidence_carry_check_id():
-    d = enforce(mk(), "x", 500.0, evidence_log=EvidenceLog())
+    d = enforce(mk(), "x", 500, evidence_log=EvidenceLog())
     assert d.check == "CAP_EXCEEDED" and d.evidence.check == "CAP_EXCEEDED"
     assert "exceeds cap" in d.reason  # advisory text still available
 
@@ -99,14 +104,15 @@ def test_evidence_hash_is_fixed_cross_language_vector():
         mandate_id="m1",
         agent="a",
         payee="tesco.com",
-        amount=49.99,
+        amount=4999,
         allowed=True,
         check="WITHIN",
-        timestamp=1000.0,
+        timestamp=1000,
         prev_hash="0" * 64,
         detail="ignored by hash",
+        tx_id="t1",
     )
-    payload = "m1|a|tesco.com|49.99|true|WITHIN|1000|" + "0" * 64
+    payload = "DECISION|t1|m1|a|tesco.com|4999|true|WITHIN|1000|" + "0" * 64
     assert rec.canonical_payload() == payload
     assert rec.hash == hashlib.sha256(payload.encode()).hexdigest()
 
@@ -116,10 +122,10 @@ def test_advisory_detail_does_not_affect_hash():
         "mandate_id": "m",
         "agent": "a",
         "payee": "p",
-        "amount": 1.0,
+        "amount": 1,
         "allowed": False,
         "check": "PAYEE",
-        "timestamp": 1.0,
+        "timestamp": 1,
         "prev_hash": "0" * 64,
     }
     assert EvidenceRecord(**base, detail="x").hash == EvidenceRecord(**base, detail="y").hash
@@ -134,11 +140,11 @@ def test_gate_verifies_credential_first():
     m = mk()
     cred = issue_credential(m, key)
     assert enforce(
-        m, "x", 10.0, evidence_log=EvidenceLog(), credential=cred, principal_key=pub
+        m, "x", 10, evidence_log=EvidenceLog(), credential=cred, principal_key=pub
     ).allowed
 
     other = SigningKey.generate().verify_key.encode().hex()
-    d = enforce(m, "x", 10.0, evidence_log=EvidenceLog(), credential=cred, principal_key=other)
+    d = enforce(m, "x", 10, evidence_log=EvidenceLog(), credential=cred, principal_key=other)
     assert d.check == "CREDENTIAL"
 
 
@@ -150,7 +156,7 @@ def test_credential_check_precedes_revocation():
     d = enforce(
         m,
         "x",
-        10.0,
+        10,
         evidence_log=EvidenceLog(),
         credential=cred,
         principal_key=SigningKey.generate().verify_key.encode().hex(),
@@ -159,7 +165,7 @@ def test_credential_check_precedes_revocation():
 
 
 def test_half_supplied_credential_binding_denied():
-    d = enforce(mk(), "x", 10.0, evidence_log=EvidenceLog(), principal_key="ab" * 32)
+    d = enforce(mk(), "x", 10, evidence_log=EvidenceLog(), principal_key="ab" * 32)
     assert d.check == "CREDENTIAL"
 
 
@@ -188,14 +194,14 @@ def test_registry_revocation_of_parent_stops_child():
     parent = mk()
     child = delegate(parent, "sub", Bounds(max_amount=50))
     reg.revoke(parent.mandate_id)
-    d = enforce(child, "x", 10.0, evidence_log=EvidenceLog(), registry=reg)
+    d = enforce(child, "x", 10, evidence_log=EvidenceLog(), registry=reg)
     assert d.check == "REVOKED_REGISTRY" and "ancestor" in d.reason
 
 
 def test_unresolvable_parent_denied():
     orphan = mk()
     orphan.parent_mandate_id = "missing"
-    assert enforce(orphan, "x", 1.0, evidence_log=EvidenceLog()).check == "REVOKED"
+    assert enforce(orphan, "x", 1, evidence_log=EvidenceLog()).check == "REVOKED"
 
 
 def test_concurrent_siblings_cannot_overspend_parent_budget():
@@ -205,7 +211,7 @@ def test_concurrent_siblings_cannot_overspend_parent_budget():
 
     def spend(child):
         for _ in range(10):
-            results.append(enforce(child, "x", 10.0, evidence_log=log).allowed)
+            results.append(enforce(child, "x", 10, evidence_log=log).allowed)
 
     threads = [threading.Thread(target=spend, args=(k,)) for k in kids]
     for t in threads:
@@ -221,8 +227,10 @@ def test_concurrent_siblings_cannot_overspend_parent_budget():
 
 def test_langchain_guard_reports_check_id():
     calls = []
-    safe = guard(mk(allowed_payees=["tesco"]), lambda payee, amount: calls.append(payee))
-    out = safe(payee="evil.io", amount=5.0)
+    safe = guard(
+        mk(allowed_payees=["tesco"]), lambda payee, amount: calls.append(payee), amount_unit="minor"
+    )
+    out = safe(payee="evil.io", amount=5)
     assert out["check"] == "PAYEE" and calls == []
 
 
@@ -232,5 +240,5 @@ def test_http_registry_malformed_response_fails_closed(body):
 
     reg = HTTPRegistry("http://registry.invalid")
     reg._request = lambda method, path, payload=None: body
-    d = enforce(mk(), "x", 10.0, evidence_log=EvidenceLog(), registry=reg)
+    d = enforce(mk(), "x", 10, evidence_log=EvidenceLog(), registry=reg)
     assert not d.allowed and d.check == "REVOKED_REGISTRY"

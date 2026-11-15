@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — implements MMF-v0.3
+
+### Security
+- **Cross-process overspend fixed.** `SQLiteStore` was documented as safe to share across
+  processes, but check-and-record was only serialized in-process: under contention, 8 processes
+  sharing one budget of 10 authorizations allowed up to 13. `atomic()` now wraps
+  check-and-record in `BEGIN IMMEDIATE`; the same race allows exactly 10.
+- **No floating point in decisions.** Amounts are integers in minor units; floats, strings,
+  booleans and values outside [1, 2^53-1] deny with `NON_POSITIVE`.
+- **Retries cannot double-spend.** `tx_id` makes `enforce()` idempotent: a retry returns the
+  stored decision (`replayed=True`) and reserves nothing; a reused `tx_id` with a different
+  request denies with `TX_CONFLICT`.
+- **Payee binding.** `Decision.binds()` plus `x402.bind_payment()` and
+  `ap2.bind_payment_mandate()` refuse to release a settlement instruction whose beneficiary,
+  amount or currency differs from the approval, or whose authorization is already settled or
+  voided. x402/AP2 gating now takes payee and amount from the rail's instruction
+  (`x402.enforce_requirements`, `ap2.enforce_cart`).
+
+### Added
+- Transaction lifecycle: `settle()` and `void()` (AUTHORIZED → SETTLED / VOIDED); `void`
+  releases budget and velocity across the delegation chain; `LifecycleError`.
+- `mandata.money`: `to_minor()` / `from_minor()` with ISO 4217 exponents and
+  `register_currency()`; conversion rejects excess precision instead of rounding.
+- Gate-signed evidence: `EvidenceLog(signing_key=...)` and `verify_chain(public_key=...)`.
+- Evidence records carry `event` (`DECISION`, `REPLAY`, `SETTLE`, `VOID`) and `tx_id`.
+- `StateStore.atomic()`, `release()`, transaction ledger (`get_tx` / `put_tx`, `TxRecord`).
+- LangChain `guard()`: `amount_unit` ("major" default, exact conversion) and `tx_id_arg`.
+- Conformance: `spec/vectors/lifecycle.json` (10), `spec/vectors/evidence.json` (canonical
+  hash vectors), 3 new core vectors; `benchmarks/enforce_latency.py`.
+- Spec [MMF-v0.3](spec/mmf-v0.3.md); v0.2 marked superseded. JSON Schema v0.3 with
+  transaction object.
+
+### Changed (breaking)
+- `Bounds.max_amount` / `total_budget` and `enforce(amount=)` are integers in minor units.
+  Use `to_minor("49.99", "GBP")`.
+- Evidence hash payload now starts `event | tx_id | ...` and serializes amounts as integers;
+  0.3.x chains will not verify under 0.4.0.
+- Credential bounds hash serializes amounts as integers — re-issue credentials.
+- `StateStore.record()` takes a `tx_id`; `spend()` returns integer totals.
+- `x402.from_payment_requirements` keeps atomic units (no float conversion);
+  `ap2.from_intent_mandate` converts decimal major units to minor units.
+
 ## [0.3.0] — implements MMF-v0.2
 
 ### Security

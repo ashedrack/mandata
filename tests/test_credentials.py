@@ -11,7 +11,7 @@ def make():
     m = Mandate(
         principal="user:alice",
         agent="agent:bot",
-        bounds=Bounds(max_amount=500.0, currency="GBP", allowed_payees=["store.example"]),
+        bounds=Bounds(max_amount=500, currency="GBP", allowed_payees=["store.example"]),
     )
     return key, m, issue_credential(m, key)
 
@@ -48,7 +48,7 @@ def test_rejects_altered_bounds():
     tampered = Mandate(
         principal="user:alice",
         agent="agent:bot",
-        bounds=Bounds(max_amount=999999.0, currency="GBP", allowed_payees=["store.example"]),
+        bounds=Bounds(max_amount=999999, currency="GBP", allowed_payees=["store.example"]),
         mandate_id=m.mandate_id,
         issued_at=m.issued_at,
     )
