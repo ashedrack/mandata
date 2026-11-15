@@ -272,23 +272,35 @@ def void(
     store=None,
     at: float | None = None,
     clock: Callable[[], float] = time.time,
+    confirmed_rail_cancelled: bool = False,
 ) -> TxRecord:
     """Release an AUTHORIZED or CLAIMED transaction that will never settle.
 
     Its reserved amount is returned to every mandate in the chain; the
     velocity slot is retained — velocity counts authorizations issued, so an
-    authorize-and-void cycle cannot evade the rate limit (MMF §5.1). This is
-    also the recovery path for a CLAIMED transaction the operator confirms
-    was never submitted to the rail: the claim slot is permanently consumed,
-    so the retry must use a new ``tx_id``.
+    authorize-and-void cycle cannot evade the rate limit (MMF §5.1).
+
+    Voiding a CLAIMED transaction releases budget while a payment may be in
+    flight, so it is a reconciliation action requiring
+    ``confirmed_rail_cancelled=True``: call it only with authoritative
+    confirmation that the rail did not execute and cannot subsequently
+    execute the instruction (a definitive decline, or proof the instruction
+    never left). An uncertain in-flight outcome MUST stay CLAIMED —
+    releasing the reservation early would let spend escape the budget. The
+    claim slot is permanently consumed either way, so a retry uses a new
+    ``tx_id``.
 
     Idempotent for already-voided transactions. A SETTLED transaction cannot
     be voided: refunds are a rail concern (MMF §8).
     """
-    return _transition(mandate, tx_id, VOIDED, evidence_log, store, at, clock)
+    return _transition(
+        mandate, tx_id, VOIDED, evidence_log, store, at, clock, confirmed_rail_cancelled
+    )
 
 
-def _transition(mandate, tx_id, target, evidence_log, store, at, clock) -> TxRecord:
+def _transition(
+    mandate, tx_id, target, evidence_log, store, at, clock, confirmed_rail_cancelled=False
+) -> TxRecord:
     at = clock() if at is None else at
     log = evidence_log or _DEFAULT_LOG
     chain, chain_error = mandate.resolve_chain()
@@ -304,6 +316,12 @@ def _transition(mandate, tx_id, target, evidence_log, store, at, clock) -> TxRec
             return tx  # idempotent repeat: unchanged, no evidence
         elif tx.status not in (AUTHORIZED, CLAIMED):
             err = f"cannot move {tx_id} from {tx.status} to {target}"
+        elif target == VOIDED and tx.status == CLAIMED and not confirmed_rail_cancelled:
+            err = (
+                f"cannot void claimed transaction {tx_id} without authoritative "
+                "confirmation the rail did not execute — an uncertain in-flight "
+                "outcome stays CLAIMED"
+            )
         if err is not None:
             # Rejected transitions are security evidence too (R6): a settle
             # attempt on a denied or voided transaction is exactly the kind

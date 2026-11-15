@@ -72,10 +72,14 @@ def guard(
         raise_on_deny: if True, raise PermissionError on denial instead of
             returning a dict (useful outside agent loops)
         settle_on_success: if True, complete the lifecycle around the tool
-            call: ``claim()`` the authorization for dispatch, ``void()`` it if
-            ``fn`` raises, ``settle()`` it if ``fn`` returns. Otherwise
-            authorizations stay reserved and the caller must complete the
-            lifecycle itself.
+            call: ``claim()`` the authorization for dispatch, then ``settle()``
+            it when ``fn`` returns. If ``fn`` raises, the authorization stays
+            CLAIMED — a raised tool call is an *uncertain* rail outcome, and
+            fail-safe semantics keep the reservation until an operator
+            reconciles it (``settle()`` after confirming funds moved, or
+            ``void(confirmed_rail_cancelled=True)`` after confirming they
+            never can). Otherwise authorizations stay reserved and the caller
+            must complete the lifecycle itself.
 
     Returns:
         A callable with the same signature; returns ``fn(...)`` on allow or a
@@ -117,7 +121,7 @@ def guard(
             }
         if not settle_on_success:
             return fn(*args, **kwargs)
-        from ..enforce import LifecycleError, claim, settle, void
+        from ..enforce import LifecycleError, claim, settle
 
         gate_amount = _to_gate_amount(amount, currency or mandate.bounds.currency, amount_unit)
         gate_currency = str(currency) if currency is not None else mandate.bounds.currency
@@ -133,11 +137,9 @@ def guard(
             )
         except LifecycleError as exc:
             raise PermissionError(f"mandate dispatch rejected: {exc}") from exc
-        try:
-            result = fn(*args, **kwargs)
-        except Exception:
-            void(mandate, decision.tx_id, evidence_log=evidence_log, store=store)
-            raise
+        # If fn raises, the rail outcome is uncertain: the authorization
+        # stays CLAIMED (fail-safe) for operator reconciliation.
+        result = fn(*args, **kwargs)
         settle(mandate, decision.tx_id, evidence_log=evidence_log, store=store)
         return result
 

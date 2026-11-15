@@ -109,7 +109,7 @@ def test_claim_slot_is_permanently_consumed():
     enforce(m, "x", 10, currency="GBP", tx_id="t1", evidence_log=log, at=1000)
     claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1000)
     # operator confirms the rail was never invoked -> void releases budget
-    void(m, "t1", evidence_log=log, at=1001)
+    void(m, "t1", evidence_log=log, at=1001, confirmed_rail_cancelled=True)
     # but the claim slot stays consumed: same tx_id can never dispatch again
     with pytest.raises(LifecycleError):
         claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1002)
@@ -133,7 +133,7 @@ def test_settle_and_void_accept_claimed():
 
     enforce(m2, "x", 10, currency="GBP", tx_id="t2", evidence_log=EvidenceLog(), at=1000)
     claim(m2, "t2", "x", 10, "GBP")
-    assert void(m2, "t2", at=1000).status == VOIDED
+    assert void(m2, "t2", at=1000, confirmed_rail_cancelled=True).status == VOIDED
 
 
 def test_concurrent_claimers_single_winner(tmp_path):
@@ -269,7 +269,7 @@ def test_rejected_lifecycle_transitions_are_security_evidence():
     assert log.verify_chain()  # rejections chain like everything else
 
 
-def test_guard_settle_on_success_claims_settles_and_voids():
+def test_guard_settle_on_success_claims_settles_and_stays_claimed_on_error():
     import time
 
     from mandata.adapters.langchain import guard
@@ -310,7 +310,8 @@ def test_guard_settle_on_success_claims_settles_and_voids():
 
     with pytest.raises(RuntimeError):
         pay_fail(payee="x", amount=10, tid="g2")
-    assert [r.event for r in log2.records] == ["DECISION", "CLAIM", "VOID"]
+    # fn raised => uncertain outcome: stays CLAIMED for operator reconciliation
+    assert [r.event for r in log2.records] == ["DECISION", "CLAIM"]
 
 
 # ---------------------------------------------------------------- v0.3.2
@@ -318,7 +319,7 @@ def test_void_releases_budget_but_not_velocity():
     m = mk(velocity_limit=1, total_budget=100)
     log = EvidenceLog()
     assert enforce(m, "x", 10, currency="GBP", tx_id="t1", evidence_log=log, at=1000).allowed
-    void(m, "t1", evidence_log=log, at=1001)
+    void(m, "t1", evidence_log=log, at=1001, confirmed_rail_cancelled=True)
     # budget refunded but the authorization slot is spent: still VELOCITY
     d = enforce(m, "x", 10, currency="GBP", tx_id="t2", evidence_log=log, at=1002)
     assert not d.allowed and d.check == "VELOCITY"

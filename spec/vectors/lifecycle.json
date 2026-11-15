@@ -745,7 +745,8 @@
           "at": 1002,
           "expect": {
             "status": "VOIDED"
-          }
+          },
+          "confirmed_rail_cancelled": true
         },
         {
           "claim": {
@@ -841,12 +842,70 @@
           "at": 1002,
           "expect": {
             "status": "VOIDED"
+          },
+          "confirmed_rail_cancelled": true
+        }
+      ],
+      "events": [
+        "DECISION",
+        "CLAIM",
+        "VOID"
+      ]
+    },
+    {
+      "id": "L16",
+      "desc": "a claimed transaction cannot be voided on an uncertain in-flight outcome; it stays CLAIMED until authoritative confirmation releases it",
+      "mandate": {
+        "bounds": {
+          "max_amount": 100
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 10,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 10,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "status": "CLAIMED"
+          }
+        },
+        {
+          "void": "t1",
+          "at": 1002,
+          "expect": {
+            "error": true
+          }
+        },
+        {
+          "void": "t1",
+          "at": 1003,
+          "confirmed_rail_cancelled": true,
+          "expect": {
+            "status": "VOIDED"
           }
         }
       ],
       "events": [
         "DECISION",
         "CLAIM",
+        "REJECTED",
         "VOID"
       ]
     }
