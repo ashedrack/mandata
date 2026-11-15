@@ -1,6 +1,6 @@
 {
-  "version": "mmf-v0.3",
-  "description": "Canonical evidence serialization vectors (MMF-v0.3 §5.2). Records chain from the genesis prev_hash (64 '0'). Each expect entry gives the exact canonical payload and its lower-case SHA-256 over UTF-8; head is the final hash. amount null denotes a non-integer amount, serialized as 'invalid'.",
+  "version": "mmf-v0.3.2",
+  "description": "Canonical evidence serialization vectors (MMF-v0.3.2 \u00a75.6). Records chain from the genesis prev_hash (64 '0'). Each expect entry gives the exact canonical payload and its lower-case SHA-256 over UTF-8 NFC; head is the final hash. amount null denotes a non-integer amount, serialized 'invalid'; absent currency/status serialize as the empty string.",
   "vectors": [
     {
       "id": "E01",
@@ -15,16 +15,18 @@
           "amount": 4999,
           "allowed": true,
           "check": "WITHIN",
-          "timestamp": 1000
+          "timestamp": 1000,
+          "currency": "GBP",
+          "status": "AUTHORIZED"
         }
       ],
       "expect": [
         {
-          "payload": "DECISION|t1|m1|a|tesco.com|4999|true|WITHIN|1000|0000000000000000000000000000000000000000000000000000000000000000",
-          "hash": "4e5002b4de47892b3b6286d54a4e2da293ebcceb5ccf314a549ba38191fe6588"
+          "payload": "DECISION|t1|m1|a|tesco.com|4999|GBP|true|WITHIN|AUTHORIZED|1000|0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "8296f95013d1fc006e7aaef0304ee9b0751223f022c6f4d6facc3953d8e15d22"
         }
       ],
-      "head": "4e5002b4de47892b3b6286d54a4e2da293ebcceb5ccf314a549ba38191fe6588"
+      "head": "8296f95013d1fc006e7aaef0304ee9b0751223f022c6f4d6facc3953d8e15d22"
     },
     {
       "id": "E02",
@@ -35,65 +37,150 @@
           "tx_id": "t1",
           "mandate_id": "m1",
           "agent": "a:shopbot",
-          "payee": "café.example",
+          "payee": "caf\u00e9.example",
           "amount": 1250,
           "allowed": true,
           "check": "WITHIN",
-          "timestamp": 1730000000.25
+          "timestamp": 1730000000.25,
+          "currency": "GBP",
+          "status": "AUTHORIZED"
         },
         {
           "event": "DECISION",
           "tx_id": "t2",
           "mandate_id": "m1",
           "agent": "a:shopbot",
-          "payee": "café.example",
+          "payee": "caf\u00e9.example",
           "amount": null,
           "allowed": false,
           "check": "NON_POSITIVE",
-          "timestamp": 1730000001
+          "timestamp": 1730000001,
+          "currency": "GBP",
+          "status": "DENIED"
         },
         {
           "event": "SETTLE",
           "tx_id": "t1",
           "mandate_id": "m1",
           "agent": "a:shopbot",
-          "payee": "café.example",
+          "payee": "caf\u00e9.example",
           "amount": 1250,
           "allowed": true,
           "check": "WITHIN",
-          "timestamp": 1730000002.5
+          "timestamp": 1730000002.5,
+          "currency": "GBP",
+          "status": "SETTLED"
         },
         {
           "event": "REPLAY",
           "tx_id": "t1",
           "mandate_id": "m1",
           "agent": "a:shopbot",
-          "payee": "café.example",
+          "payee": "caf\u00e9.example",
           "amount": 1250,
           "allowed": true,
           "check": "WITHIN",
-          "timestamp": 1730000003
+          "timestamp": 1730000003,
+          "currency": "GBP",
+          "status": "AUTHORIZED"
         }
       ],
       "expect": [
         {
-          "payload": "DECISION|t1|m1|a:shopbot|café.example|1250|true|WITHIN|1730000000.25|0000000000000000000000000000000000000000000000000000000000000000",
-          "hash": "5e136672eef7f19831fbef9d1422613079904915f132bb559875ee9073461f5c"
+          "payload": "DECISION|t1|m1|a:shopbot|caf\u00e9.example|1250|GBP|true|WITHIN|AUTHORIZED|1730000000.25|0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "b5a2b94dcbb141be45793403cea78824ce7474c7b21460ab03d9e0d59eca1af3"
         },
         {
-          "payload": "DECISION|t2|m1|a:shopbot|café.example|invalid|false|NON_POSITIVE|1730000001|5e136672eef7f19831fbef9d1422613079904915f132bb559875ee9073461f5c",
-          "hash": "f9e52b1d681d745ad49f717041e135ffce5f7b85e50a6980128c8c35fd733f0e"
+          "payload": "DECISION|t2|m1|a:shopbot|caf\u00e9.example|invalid|GBP|false|NON_POSITIVE|DENIED|1730000001|b5a2b94dcbb141be45793403cea78824ce7474c7b21460ab03d9e0d59eca1af3",
+          "hash": "863d0e1ee7e0f22daa4730f7edef1a9b5b36323add13f15ac25e5d7fc6fd0667"
         },
         {
-          "payload": "SETTLE|t1|m1|a:shopbot|café.example|1250|true|WITHIN|1730000002.5|f9e52b1d681d745ad49f717041e135ffce5f7b85e50a6980128c8c35fd733f0e",
-          "hash": "c810a8801601725551c98f36f79f73ff35a69182f529d008ec57ccde35247cfc"
+          "payload": "SETTLE|t1|m1|a:shopbot|caf\u00e9.example|1250|GBP|true|WITHIN|SETTLED|1730000002.5|863d0e1ee7e0f22daa4730f7edef1a9b5b36323add13f15ac25e5d7fc6fd0667",
+          "hash": "4335986a47e8e7fd71143c4eb4cf4fed020949f39443a003bc1ffc894a6fab1a"
         },
         {
-          "payload": "REPLAY|t1|m1|a:shopbot|café.example|1250|true|WITHIN|1730000003|c810a8801601725551c98f36f79f73ff35a69182f529d008ec57ccde35247cfc",
-          "hash": "8759f2a2fa73ead3175ffd30728eb45c1436435b54ef86ff36c1e4edf16e2aeb"
+          "payload": "REPLAY|t1|m1|a:shopbot|caf\u00e9.example|1250|GBP|true|WITHIN|AUTHORIZED|1730000003|4335986a47e8e7fd71143c4eb4cf4fed020949f39443a003bc1ffc894a6fab1a",
+          "hash": "85bac01645ff30f90917ac6b849032c8776b2db6b1427070552d734a5fe646cf"
         }
       ],
-      "head": "8759f2a2fa73ead3175ffd30728eb45c1436435b54ef86ff36c1e4edf16e2aeb"
+      "head": "85bac01645ff30f90917ac6b849032c8776b2db6b1427070552d734a5fe646cf"
+    },
+    {
+      "id": "E03",
+      "desc": "lifecycle events: claim, rejected second claim, settle \u2014 status and currency hashed",
+      "records": [
+        {
+          "event": "DECISION",
+          "tx_id": "t1",
+          "mandate_id": "m1",
+          "agent": "a",
+          "payee": "tesco.com",
+          "amount": 4999,
+          "currency": "GBP",
+          "allowed": true,
+          "check": "WITHIN",
+          "status": "AUTHORIZED",
+          "timestamp": 1000
+        },
+        {
+          "event": "CLAIM",
+          "tx_id": "t1",
+          "mandate_id": "m1",
+          "agent": "a",
+          "payee": "tesco.com",
+          "amount": 4999,
+          "currency": "GBP",
+          "allowed": true,
+          "check": "WITHIN",
+          "status": "CLAIMED",
+          "timestamp": 1001
+        },
+        {
+          "event": "REJECTED",
+          "tx_id": "t1",
+          "mandate_id": "m1",
+          "agent": "a",
+          "payee": "evil.example",
+          "amount": 4999,
+          "currency": "GBP",
+          "allowed": false,
+          "check": "CLAIM",
+          "status": "CLAIMED",
+          "timestamp": 1002
+        },
+        {
+          "event": "SETTLE",
+          "tx_id": "t1",
+          "mandate_id": "m1",
+          "agent": "a",
+          "payee": "tesco.com",
+          "amount": 4999,
+          "currency": "GBP",
+          "allowed": true,
+          "check": "WITHIN",
+          "status": "SETTLED",
+          "timestamp": 1003
+        }
+      ],
+      "expect": [
+        {
+          "payload": "DECISION|t1|m1|a|tesco.com|4999|GBP|true|WITHIN|AUTHORIZED|1000|0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "8296f95013d1fc006e7aaef0304ee9b0751223f022c6f4d6facc3953d8e15d22"
+        },
+        {
+          "payload": "CLAIM|t1|m1|a|tesco.com|4999|GBP|true|WITHIN|CLAIMED|1001|8296f95013d1fc006e7aaef0304ee9b0751223f022c6f4d6facc3953d8e15d22",
+          "hash": "379b79710efa7690cc8222fdca3e6508e16234242e8c94ab910ebec0424b3447"
+        },
+        {
+          "payload": "REJECTED|t1|m1|a|evil.example|4999|GBP|false|CLAIM|CLAIMED|1002|379b79710efa7690cc8222fdca3e6508e16234242e8c94ab910ebec0424b3447",
+          "hash": "faf5b9d30b214d96ed751a128f079ac63985354c921d51f7b1437bd03bf09664"
+        },
+        {
+          "payload": "SETTLE|t1|m1|a|tesco.com|4999|GBP|true|WITHIN|SETTLED|1003|faf5b9d30b214d96ed751a128f079ac63985354c921d51f7b1437bd03bf09664",
+          "hash": "06f97074f733a6f19a714f629d4a38bbeaa1ce94abeba612f8fe4bec925aad85"
+        }
+      ],
+      "head": "06f97074f733a6f19a714f629d4a38bbeaa1ce94abeba612f8fe4bec925aad85"
     }
   ]
 }

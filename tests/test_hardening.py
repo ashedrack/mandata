@@ -111,8 +111,10 @@ def test_evidence_hash_is_fixed_cross_language_vector():
         prev_hash="0" * 64,
         detail="ignored by hash",
         tx_id="t1",
+        currency="GBP",
+        status="AUTHORIZED",
     )
-    payload = "DECISION|t1|m1|a|tesco.com|4999|true|WITHIN|1000|" + "0" * 64
+    payload = "DECISION|t1|m1|a|tesco.com|4999|GBP|true|WITHIN|AUTHORIZED|1000|" + "0" * 64
     assert rec.canonical_payload() == payload
     assert rec.hash == hashlib.sha256(payload.encode()).hexdigest()
 

@@ -6,6 +6,7 @@ import hashlib
 import math
 import threading
 import time
+import unicodedata
 import uuid
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -33,7 +34,7 @@ CHECKS = (
 
 # Evidence events (MMF §5.4): a gate decision, an idempotent replay of one,
 # and the settlement-lifecycle transitions of an authorization.
-EVENTS = ("DECISION", "REPLAY", "CLAIM", "UNCLAIM", "SETTLE", "VOID")
+EVENTS = ("DECISION", "REPLAY", "CLAIM", "REJECTED", "SETTLE", "VOID")
 
 
 def canonical_number(x: float) -> str:
@@ -222,6 +223,8 @@ class EvidenceRecord:
     detail: str = ""
     tx_id: str = ""
     event: str = "DECISION"
+    currency: str = ""
+    status: str = ""
     signature: str = ""
 
     @property
@@ -236,6 +239,11 @@ class EvidenceRecord:
         contain ``|`` (identifiers containing it make the payload ambiguous,
         so this raises rather than hashing something unverifiable).
         """
+        # MMF-v0.3.2 canonical form (v2): every security-relevant field is
+        # hashed, including the transaction currency and the lifecycle status
+        # the record transitions to ("" for records without one). String
+        # fields are UTF-8 NFC; absent fields are the empty string; ALLOWED is
+        # the literal "true"/"false".
         fields = [
             self.event,
             self.tx_id,
@@ -243,11 +251,14 @@ class EvidenceRecord:
             self.agent,
             self.payee,
             str(self.amount) if is_minor_amount(self.amount) else "invalid",
+            self.currency,
             "true" if self.allowed else "false",
             self.check,
+            self.status,
             canonical_number(self.timestamp),
             self.prev_hash,
         ]
+        fields = [unicodedata.normalize("NFC", f) for f in fields]
         for f in fields:
             if "|" in f:
                 raise ValueError(f"evidence field contains '|' and cannot be serialized: {f!r}")

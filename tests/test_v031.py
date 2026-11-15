@@ -16,7 +16,6 @@ from mandata import (
     delegate,
     enforce,
     settle,
-    unclaim,
     void,
 )
 from mandata.credentials import issue_credential
@@ -80,7 +79,7 @@ def test_claim_dispatches_exactly_once():
         claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1000)  # second dispatcher loses
 
     settle(m, "t1", evidence_log=log, at=1000)
-    assert [r.event for r in log.records] == ["DECISION", "CLAIM", "SETTLE"]
+    assert [r.event for r in log.records] == ["DECISION", "CLAIM", "REJECTED", "SETTLE"]
 
 
 def test_claim_rejects_unbound_instruction():
@@ -101,13 +100,29 @@ def test_replayed_decision_cannot_dispatch():
     assert d.replayed and d.status == CLAIMED and not d.binds("x", 10, "GBP")
 
 
-def test_unclaim_releases_for_operator_recovery():
+def test_claim_slot_is_permanently_consumed():
+    """MMF-v0.3.2: at most one dispatch per tx_id, unconditionally — the
+    confirmed-never-invoked recovery path is void + a NEW tx_id, never
+    a re-claim of the same one."""
     m = mk()
-    enforce(m, "x", 10, currency="GBP", tx_id="t1", evidence_log=EvidenceLog(), at=1000)
-    claim(m, "t1", "x", 10, "GBP", at=1000)
-    unclaim(m, "t1", at=1000)
-    tx = claim(m, "t1", "x", 10, "GBP", at=1000)  # can claim again after unclaim
-    assert tx.status == CLAIMED
+    log = EvidenceLog()
+    enforce(m, "x", 10, currency="GBP", tx_id="t1", evidence_log=log, at=1000)
+    claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1000)
+    # operator confirms the rail was never invoked -> void releases budget
+    void(m, "t1", evidence_log=log, at=1001)
+    # but the claim slot stays consumed: same tx_id can never dispatch again
+    with pytest.raises(LifecycleError):
+        claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1002)
+    # retry proceeds under a new tx_id (budget was released by the void)
+    d = enforce(m, "x", 10, currency="GBP", tx_id="t2", evidence_log=log, at=1003)
+    assert d.allowed
+    assert [r.event for r in log.records] == [
+        "DECISION",
+        "CLAIM",
+        "VOID",
+        "REJECTED",
+        "DECISION",
+    ]
 
 
 def test_settle_and_void_accept_claimed():
@@ -236,7 +251,9 @@ def test_pipe_in_identifier_fails_closed():
         rec.canonical_payload()
 
 
-def test_lifecycle_rejected_transition_leaves_no_evidence():
+def test_rejected_lifecycle_transitions_are_security_evidence():
+    """MMF-v0.3.2: rejected lifecycle operations append a REJECTED record —
+    a binding-mismatched claim is exactly the T6 substitution signal."""
     m = mk()
     log = EvidenceLog()
     enforce(m, "x", 10, currency="GBP", tx_id="t1", evidence_log=log, at=1000)
@@ -245,7 +262,11 @@ def test_lifecycle_rejected_transition_leaves_no_evidence():
         settle(m, "nope", evidence_log=log, at=1000)
     with pytest.raises(LifecycleError):
         claim(m, "t1", "evil", 10, "GBP", evidence_log=log, at=1000)
-    assert len(log.records) == n
+    new = log.records[n:]
+    assert [r.event for r in new] == ["REJECTED", "REJECTED"]
+    assert new[0].check == "SETTLE" and not new[0].allowed
+    assert new[1].check == "CLAIM" and new[1].payee == "evil"
+    assert log.verify_chain()  # rejections chain like everything else
 
 
 def test_guard_settle_on_success_claims_settles_and_voids():
@@ -290,3 +311,47 @@ def test_guard_settle_on_success_claims_settles_and_voids():
     with pytest.raises(RuntimeError):
         pay_fail(payee="x", amount=10, tid="g2")
     assert [r.event for r in log2.records] == ["DECISION", "CLAIM", "VOID"]
+
+
+# ---------------------------------------------------------------- v0.3.2
+def test_void_releases_budget_but_not_velocity():
+    m = mk(velocity_limit=1, total_budget=100)
+    log = EvidenceLog()
+    assert enforce(m, "x", 10, currency="GBP", tx_id="t1", evidence_log=log, at=1000).allowed
+    void(m, "t1", evidence_log=log, at=1001)
+    # budget refunded but the authorization slot is spent: still VELOCITY
+    d = enforce(m, "x", 10, currency="GBP", tx_id="t2", evidence_log=log, at=1002)
+    assert not d.allowed and d.check == "VELOCITY"
+
+
+def test_tx_id_namespace_is_per_gate_cross_mandate_conflict():
+    """The ledger key is tx_id within a gate's store; two mandates colliding
+    on the same key fail closed with TX_CONFLICT."""
+    from mandata.state import InMemoryStore
+
+    store = InMemoryStore()
+    m1, m2 = mk(), mk()
+    m1._state = m2._state = store
+    log = EvidenceLog()
+    assert enforce(
+        m1, "x", 10, currency="GBP", tx_id="order-1", store=store, evidence_log=log, at=1000
+    ).allowed
+    d = enforce(
+        m2, "x", 10, currency="GBP", tx_id="order-1", store=store, evidence_log=log, at=1001
+    )
+    assert not d.allowed and d.check == "TX_CONFLICT"
+    # and a lifecycle op scoped to the wrong mandate is rejected
+    with pytest.raises(LifecycleError):
+        settle(m2, "order-1", store=store, evidence_log=log, at=1002)
+
+
+def test_child_budget_window_must_not_cycle_faster_than_parent():
+    parent = mk(total_budget=1000, budget_window_days=30)
+    # shorter window cycles the allowance faster -> rejected as widening
+    with pytest.raises(ValueError, match="window"):
+        delegate(parent, "s", Bounds(max_amount=100, total_budget=100, budget_window_days=1), at=0)
+    # equal or longer is fine
+    ok = delegate(
+        parent, "s", Bounds(max_amount=100, total_budget=100, budget_window_days=60), at=0
+    )
+    assert ok.parent_mandate_id == parent.mandate_id

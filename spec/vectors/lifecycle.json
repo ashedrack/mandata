@@ -213,7 +213,7 @@
     },
     {
       "id": "L05",
-      "desc": "void releases the velocity slot",
+      "desc": "void releases the reserved budget but NOT the velocity slot: velocity counts authorizations issued, so authorize-and-void cycling cannot evade the rate limit",
       "mandate": {
         "bounds": {
           "max_amount": 100,
@@ -263,8 +263,8 @@
             "currency": "GBP"
           },
           "expect": {
-            "allowed": true,
-            "check": "WITHIN"
+            "allowed": false,
+            "check": "VELOCITY"
           }
         }
       ],
@@ -336,6 +336,7 @@
       "events": [
         "DECISION",
         "SETTLE",
+        "REJECTED",
         "DECISION"
       ]
     },
@@ -378,7 +379,9 @@
         }
       ],
       "events": [
-        "DECISION"
+        "DECISION",
+        "REJECTED",
+        "REJECTED"
       ]
     },
     {
@@ -436,6 +439,7 @@
       "events": [
         "DECISION",
         "VOID",
+        "REJECTED",
         "REPLAY"
       ]
     },
@@ -529,7 +533,10 @@
           }
         }
       ],
-      "events": []
+      "events": [
+        "REJECTED",
+        "REJECTED"
+      ]
     },
     {
       "id": "L11",
@@ -629,7 +636,8 @@
       ],
       "events": [
         "DECISION",
-        "CLAIM"
+        "CLAIM",
+        "REJECTED"
       ]
     },
     {
@@ -693,12 +701,14 @@
       ],
       "events": [
         "DECISION",
+        "REJECTED",
+        "REJECTED",
         "CLAIM"
       ]
     },
     {
       "id": "L14",
-      "desc": "unclaim releases a claimed transaction for operator recovery; it can be claimed again",
+      "desc": "a claim permanently consumes the dispatch slot: after the operator confirms the rail was never invoked, void releases the reservation and the retry uses a new tx_id \u2014 the same tx_id can never be claimed again",
       "mandate": {
         "bounds": {
           "max_amount": 100
@@ -731,10 +741,10 @@
           }
         },
         {
-          "unclaim": "t1",
+          "void": "t1",
           "at": 1002,
           "expect": {
-            "status": "AUTHORIZED"
+            "status": "VOIDED"
           }
         },
         {
@@ -746,12 +756,37 @@
           },
           "at": 1003,
           "expect": {
+            "error": true
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount": 10,
+            "at": 1004,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount": 10,
+            "currency": "GBP"
+          },
+          "at": 1005,
+          "expect": {
             "status": "CLAIMED"
           }
         },
         {
-          "settle": "t1",
-          "at": 1004,
+          "settle": "t2",
+          "at": 1006,
           "expect": {
             "status": "SETTLED"
           }
@@ -760,7 +795,9 @@
       "events": [
         "DECISION",
         "CLAIM",
-        "UNCLAIM",
+        "VOID",
+        "REJECTED",
+        "DECISION",
         "CLAIM",
         "SETTLE"
       ]

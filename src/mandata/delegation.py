@@ -51,6 +51,15 @@ def delegate(parent: Mandate, sub_agent: str, bounds: Bounds, at: float | None =
         bounds.total_budget is None or bounds.total_budget > pb.total_budget
     ):
         violations.append("budget exceeds parent's (null = unlimited)")
+    if pb.total_budget is not None and bounds.budget_window_days < pb.budget_window_days:
+        # A shorter window cycles the same allowance faster (1000/1d is 30k/30d),
+        # which is wider, not narrower. Longer-or-equal windows are required so
+        # the child's own bound never exceeds the parent's rate. Chain-wide
+        # charging makes the effective authority the intersection regardless.
+        violations.append(
+            f"budget window {bounds.budget_window_days}d is shorter than parent's "
+            f"{pb.budget_window_days}d (cycles the allowance faster)"
+        )
     if violations:
         raise ValueError("delegation widens scope: " + "; ".join(violations))
 

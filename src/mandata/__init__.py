@@ -1,14 +1,14 @@
 """Mandata — the mandate toolkit for agent-initiated payments."""
 
 from .delegation import delegate
-from .enforce import LifecycleError, claim, enforce, settle, unclaim, void
+from .enforce import LifecycleError, claim, enforce, settle, void
 from .evidence import EvidenceLog
 from .models import CHECKS, EVENTS, Bounds, Decision, EvidenceRecord, Mandate, canonical_number
 from .money import from_minor, register_currency, to_minor
 from .revocation import HTTPRegistry, InMemoryRegistry, RevocationRegistry
 from .state import InMemoryStore, SQLiteStore, StateStore, TxRecord
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 __all__ = [
     "CHECKS",
     "EVENTS",
@@ -33,6 +33,5 @@ __all__ = [
     "register_currency",
     "settle",
     "to_minor",
-    "unclaim",
     "void",
 ]
