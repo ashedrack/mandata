@@ -1,0 +1,99 @@
+{
+  "version": "mmf-v0.3",
+  "description": "Canonical evidence serialization vectors (MMF-v0.3 §5.2). Records chain from the genesis prev_hash (64 '0'). Each expect entry gives the exact canonical payload and its lower-case SHA-256 over UTF-8; head is the final hash. amount null denotes a non-integer amount, serialized as 'invalid'.",
+  "vectors": [
+    {
+      "id": "E01",
+      "desc": "single allowed decision",
+      "records": [
+        {
+          "event": "DECISION",
+          "tx_id": "t1",
+          "mandate_id": "m1",
+          "agent": "a",
+          "payee": "tesco.com",
+          "amount": 4999,
+          "allowed": true,
+          "check": "WITHIN",
+          "timestamp": 1000
+        }
+      ],
+      "expect": [
+        {
+          "payload": "DECISION|t1|m1|a|tesco.com|4999|true|WITHIN|1000|0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "4e5002b4de47892b3b6286d54a4e2da293ebcceb5ccf314a549ba38191fe6588"
+        }
+      ],
+      "head": "4e5002b4de47892b3b6286d54a4e2da293ebcceb5ccf314a549ba38191fe6588"
+    },
+    {
+      "id": "E02",
+      "desc": "chain: allow, denial with invalid amount, settle, replay; fractional timestamp; UTF-8 payee",
+      "records": [
+        {
+          "event": "DECISION",
+          "tx_id": "t1",
+          "mandate_id": "m1",
+          "agent": "a:shopbot",
+          "payee": "café.example",
+          "amount": 1250,
+          "allowed": true,
+          "check": "WITHIN",
+          "timestamp": 1730000000.25
+        },
+        {
+          "event": "DECISION",
+          "tx_id": "t2",
+          "mandate_id": "m1",
+          "agent": "a:shopbot",
+          "payee": "café.example",
+          "amount": null,
+          "allowed": false,
+          "check": "NON_POSITIVE",
+          "timestamp": 1730000001
+        },
+        {
+          "event": "SETTLE",
+          "tx_id": "t1",
+          "mandate_id": "m1",
+          "agent": "a:shopbot",
+          "payee": "café.example",
+          "amount": 1250,
+          "allowed": true,
+          "check": "WITHIN",
+          "timestamp": 1730000002.5
+        },
+        {
+          "event": "REPLAY",
+          "tx_id": "t1",
+          "mandate_id": "m1",
+          "agent": "a:shopbot",
+          "payee": "café.example",
+          "amount": 1250,
+          "allowed": true,
+          "check": "WITHIN",
+          "timestamp": 1730000003
+        }
+      ],
+      "expect": [
+        {
+          "payload": "DECISION|t1|m1|a:shopbot|café.example|1250|true|WITHIN|1730000000.25|0000000000000000000000000000000000000000000000000000000000000000",
+          "hash": "5e136672eef7f19831fbef9d1422613079904915f132bb559875ee9073461f5c"
+        },
+        {
+          "payload": "DECISION|t2|m1|a:shopbot|café.example|invalid|false|NON_POSITIVE|1730000001|5e136672eef7f19831fbef9d1422613079904915f132bb559875ee9073461f5c",
+          "hash": "f9e52b1d681d745ad49f717041e135ffce5f7b85e50a6980128c8c35fd733f0e"
+        },
+        {
+          "payload": "SETTLE|t1|m1|a:shopbot|café.example|1250|true|WITHIN|1730000002.5|f9e52b1d681d745ad49f717041e135ffce5f7b85e50a6980128c8c35fd733f0e",
+          "hash": "c810a8801601725551c98f36f79f73ff35a69182f529d008ec57ccde35247cfc"
+        },
+        {
+          "payload": "REPLAY|t1|m1|a:shopbot|café.example|1250|true|WITHIN|1730000003|c810a8801601725551c98f36f79f73ff35a69182f529d008ec57ccde35247cfc",
+          "hash": "8759f2a2fa73ead3175ffd30728eb45c1436435b54ef86ff36c1e4edf16e2aeb"
+        }
+      ],
+      "head": "8759f2a2fa73ead3175ffd30728eb45c1436435b54ef86ff36c1e4edf16e2aeb"
+    }
+  ]
+}

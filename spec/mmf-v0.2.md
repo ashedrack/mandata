@@ -1,6 +1,6 @@
 # The Mandata Mandate Format (MMF) — v0.2
 
-**Status:** Draft specification (supersedes [v0.1](mmf-v0.1.md))
+**Status:** Superseded by [v0.3](mmf-v0.3.md) (supersedes [v0.1](mmf-v0.1.md))
 **Reference implementation:** `mandata` ≥ 0.3.0 (Python)
 **License:** Apache-2.0
 

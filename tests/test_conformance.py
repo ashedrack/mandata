@@ -8,11 +8,24 @@ from pathlib import Path
 
 import pytest
 
-from mandata import Bounds, EvidenceLog, InMemoryRegistry, Mandate, delegate, enforce
+from mandata import (
+    Bounds,
+    EvidenceLog,
+    InMemoryRegistry,
+    LifecycleError,
+    Mandate,
+    delegate,
+    enforce,
+    settle,
+    void,
+)
+from mandata.models import EvidenceRecord
 
 SPEC = Path(__file__).parent.parent / "spec" / "vectors"
 CORE = json.loads((SPEC / "core.json").read_text())["vectors"]
 DELEGATION = json.loads((SPEC / "delegation.json").read_text())["vectors"]
+LIFECYCLE = json.loads((SPEC / "lifecycle.json").read_text())["vectors"]
+EVIDENCE = json.loads((SPEC / "evidence.json").read_text())["vectors"]
 
 
 class UnavailableRegistry:
@@ -22,7 +35,7 @@ class UnavailableRegistry:
 
 def build_bounds(b: dict) -> Bounds:
     return Bounds(
-        max_amount=b.get("max_amount", 1e9),
+        max_amount=b.get("max_amount", 10**9),
         currency=b.get("currency", "GBP"),
         allowed_payees=b.get("allowed_payees", []),
         expires_in_days=b.get("expires_in_days", 30),
@@ -66,6 +79,7 @@ def run(m, tx, log, registry=None):
         at=tx["at"],
         evidence_log=log,
         registry=registry,
+        tx_id=tx.get("tx_id"),
     )
 
 
@@ -75,7 +89,7 @@ def test_core_vector(v):
     registry = build_registry(v.get("registry"))
     log = EvidenceLog()
     for p in v.get("prior_txns", []):  # seed prior allowed spend
-        m._state.record(m.mandate_id, p["at"], p["amount"])
+        m.record(p["at"], p["amount"])
 
     d = run(m, v["tx"], log, registry)
     assert (d.allowed, d.check) == (v["expect"]["allowed"], v["expect"]["check"]), d.reason
@@ -113,3 +127,44 @@ def test_delegation_vector(v):
             expect = step["expect"]
             assert (d.allowed, d.check) == (expect["allowed"], expect["check"]), d.reason
     assert log.verify_chain()
+
+
+@pytest.mark.parametrize("v", LIFECYCLE, ids=[v["id"] for v in LIFECYCLE])
+def test_lifecycle_vector(v):
+    m = build_mandate(v["mandate"])
+    log = EvidenceLog()
+    for step in v["steps"]:
+        expect = step["expect"]
+        if "tx" in step:
+            d = run(m, step["tx"], log)
+            got = {
+                "allowed": d.allowed,
+                "check": d.check,
+                "replayed": d.replayed,
+                "status": d.status,
+            }
+            assert {k: got[k] for k in expect} == expect, d.reason
+            continue
+        op, tx_id = ("settle", step["settle"]) if "settle" in step else ("void", step["void"])
+        before = len(log.records)
+        if expect.get("error"):
+            with pytest.raises(LifecycleError):
+                (settle if op == "settle" else void)(m, tx_id, evidence_log=log, at=step["at"])
+            assert len(log.records) == before  # rejected transitions leave no evidence
+        else:
+            tx = (settle if op == "settle" else void)(m, tx_id, evidence_log=log, at=step["at"])
+            assert tx.status == expect["status"]
+    assert [r.event for r in log.records] == v["events"]
+    assert log.verify_chain()
+
+
+@pytest.mark.parametrize("v", EVIDENCE, ids=[v["id"] for v in EVIDENCE])
+def test_evidence_hash_vector(v):
+    """Canonical serialization + SHA-256 must match byte-for-byte (MMF §5.2)."""
+    prev = "0" * 64
+    for r, expected in zip(v["records"], v["expect"], strict=True):
+        rec = EvidenceRecord(prev_hash=prev, **r)
+        assert rec.canonical_payload() == expected["payload"]
+        assert rec.hash == expected["hash"]
+        prev = rec.hash
+    assert prev == v["head"]

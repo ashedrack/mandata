@@ -1,0 +1,89 @@
+{
+  "version": "mmf-v0.3",
+  "description": "Transaction lifecycle vectors (MMF-v0.3 §5.3-5.4). Each vector runs its steps in order against one mandate. A tx step calls the gate; settle/void steps transition a tx_id. expect.error=true means the transition MUST be rejected and MUST NOT append evidence. events lists the evidence event of every record, in order. Amounts are minor units.",
+  "vectors": [
+    {"id": "L01", "desc": "retry after timeout with the same tx_id returns the original decision and reserves nothing",
+     "mandate": {"bounds": {"max_amount": 100, "total_budget": 100}},
+     "steps": [
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 60, "at": 1000}, "expect": {"allowed": true, "check": "WITHIN", "replayed": false, "status": "AUTHORIZED"}},
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 60, "at": 1001}, "expect": {"allowed": true, "check": "WITHIN", "replayed": true, "status": "AUTHORIZED"}},
+       {"tx": {"tx_id": "t2", "payee": "x", "amount": 40, "at": 1002}, "expect": {"allowed": true, "check": "WITHIN", "replayed": false, "status": "AUTHORIZED"}}
+     ],
+     "events": ["DECISION", "REPLAY", "DECISION"]},
+    {"id": "L02", "desc": "same tx_id with a different amount is a conflict",
+     "mandate": {"bounds": {"max_amount": 100}},
+     "steps": [
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 10, "at": 1000}, "expect": {"allowed": true, "check": "WITHIN"}},
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 90, "at": 1001}, "expect": {"allowed": false, "check": "TX_CONFLICT", "replayed": false}}
+     ],
+     "events": ["DECISION", "DECISION"]},
+    {"id": "L03", "desc": "same tx_id with a different payee is a conflict",
+     "mandate": {"bounds": {"max_amount": 100}},
+     "steps": [
+       {"tx": {"tx_id": "t1", "payee": "tesco.com", "amount": 10, "at": 1000}, "expect": {"allowed": true, "check": "WITHIN"}},
+       {"tx": {"tx_id": "t1", "payee": "evil.io", "amount": 10, "at": 1001}, "expect": {"allowed": false, "check": "TX_CONFLICT"}}
+     ],
+     "events": ["DECISION", "DECISION"]},
+    {"id": "L04", "desc": "void releases reserved budget",
+     "mandate": {"bounds": {"max_amount": 100, "total_budget": 100}},
+     "steps": [
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 80, "at": 1000}, "expect": {"allowed": true, "check": "WITHIN"}},
+       {"tx": {"tx_id": "t2", "payee": "x", "amount": 50, "at": 1001}, "expect": {"allowed": false, "check": "BUDGET"}},
+       {"void": "t1", "at": 1002, "expect": {"status": "VOIDED"}},
+       {"tx": {"tx_id": "t3", "payee": "x", "amount": 50, "at": 1003}, "expect": {"allowed": true, "check": "WITHIN"}}
+     ],
+     "events": ["DECISION", "DECISION", "VOID", "DECISION"]},
+    {"id": "L05", "desc": "void releases the velocity slot",
+     "mandate": {"bounds": {"max_amount": 100, "velocity_limit": 1}},
+     "steps": [
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 10, "at": 1000}, "expect": {"allowed": true, "check": "WITHIN"}},
+       {"tx": {"tx_id": "t2", "payee": "x", "amount": 10, "at": 1001}, "expect": {"allowed": false, "check": "VELOCITY"}},
+       {"void": "t1", "at": 1002, "expect": {"status": "VOIDED"}},
+       {"tx": {"tx_id": "t3", "payee": "x", "amount": 10, "at": 1003}, "expect": {"allowed": true, "check": "WITHIN"}}
+     ],
+     "events": ["DECISION", "DECISION", "VOID", "DECISION"]},
+    {"id": "L06", "desc": "settled transactions keep their budget and cannot be voided; settle is idempotent",
+     "mandate": {"bounds": {"max_amount": 100, "total_budget": 100}},
+     "steps": [
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 80, "at": 1000}, "expect": {"allowed": true, "check": "WITHIN"}},
+       {"settle": "t1", "at": 1001, "expect": {"status": "SETTLED"}},
+       {"settle": "t1", "at": 1002, "expect": {"status": "SETTLED"}},
+       {"void": "t1", "at": 1003, "expect": {"error": true}},
+       {"tx": {"tx_id": "t2", "payee": "x", "amount": 50, "at": 1004}, "expect": {"allowed": false, "check": "BUDGET"}}
+     ],
+     "events": ["DECISION", "SETTLE", "DECISION"]},
+    {"id": "L07", "desc": "a denied transaction cannot be settled or voided",
+     "mandate": {"bounds": {"max_amount": 100}},
+     "steps": [
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 500, "at": 1000}, "expect": {"allowed": false, "check": "CAP_EXCEEDED", "status": "DENIED"}},
+       {"settle": "t1", "at": 1001, "expect": {"error": true}},
+       {"void": "t1", "at": 1002, "expect": {"error": true}}
+     ],
+     "events": ["DECISION"]},
+    {"id": "L08", "desc": "a voided transaction cannot be settled; replay reports VOIDED",
+     "mandate": {"bounds": {"max_amount": 100}},
+     "steps": [
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 10, "at": 1000}, "expect": {"allowed": true, "check": "WITHIN"}},
+       {"void": "t1", "at": 1001, "expect": {"status": "VOIDED"}},
+       {"settle": "t1", "at": 1002, "expect": {"error": true}},
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 10, "at": 1003}, "expect": {"allowed": true, "check": "WITHIN", "replayed": true, "status": "VOIDED"}}
+     ],
+     "events": ["DECISION", "VOID", "REPLAY"]},
+    {"id": "L09", "desc": "a denial replays as the same denial even after the cause is gone",
+     "mandate": {"bounds": {"max_amount": 100, "velocity_limit": 1}},
+     "steps": [
+       {"tx": {"tx_id": "t1", "payee": "x", "amount": 10, "at": 1000}, "expect": {"allowed": true, "check": "WITHIN"}},
+       {"tx": {"tx_id": "t2", "payee": "x", "amount": 10, "at": 1001}, "expect": {"allowed": false, "check": "VELOCITY"}},
+       {"void": "t1", "at": 1002, "expect": {"status": "VOIDED"}},
+       {"tx": {"tx_id": "t2", "payee": "x", "amount": 10, "at": 1003}, "expect": {"allowed": false, "check": "VELOCITY", "replayed": true, "status": "DENIED"}}
+     ],
+     "events": ["DECISION", "DECISION", "VOID", "REPLAY"]},
+    {"id": "L10", "desc": "settle/void of an unknown tx_id is rejected",
+     "mandate": {"bounds": {"max_amount": 100}},
+     "steps": [
+       {"settle": "nope", "at": 1000, "expect": {"error": true}},
+       {"void": "nope", "at": 1001, "expect": {"error": true}}
+     ],
+     "events": []}
+  ]
+}

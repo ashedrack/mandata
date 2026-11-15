@@ -10,7 +10,7 @@ def test_parallel_calls_never_exceed_velocity_limit():
     results = []
 
     def attempt():
-        d = enforce(m, "store.example", 10.0, evidence_log=log)
+        d = enforce(m, "store.example", 10, evidence_log=log)
         results.append(d.allowed)
 
     threads = [threading.Thread(target=attempt) for _ in range(50)]
@@ -31,7 +31,7 @@ def test_records_stay_chained_under_parallel_appends():
     m2 = Mandate(principal="u2", agent="b", bounds=Bounds(max_amount=50))
 
     def attempt(mandate):
-        enforce(mandate, "store.example", 5.0, evidence_log=log)
+        enforce(mandate, "store.example", 5, evidence_log=log)
 
     threads = [threading.Thread(target=attempt, args=(m,)) for _ in range(30)] + [
         threading.Thread(target=attempt, args=(m2,)) for _ in range(30)

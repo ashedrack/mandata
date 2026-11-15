@@ -18,10 +18,20 @@ Usage with a LangChain tool::
 Or with any callable::
 
     safe = guard(mandate, my_payment_fn)
-    safe(payee="tesco.com", amount=49.99)
+    safe(payee="tesco.com", amount="49.99")
+
+Tool amounts are major units by default (``"49.99"`` GBP -> 4999 pence);
+pass ``amount_unit="minor"`` if the tool already takes minor units. A value
+that cannot be converted exactly is passed to the gate as-is and denied
+(``NON_POSITIVE``) — the guard never rounds.
 
 On denial the wrapped callable is NEVER invoked — the guard returns a dict
 describing the rejection, which the agent observes as tool output.
+
+Deployment note (MMF §5.3): the guard runs inside the agent's process, so it
+defends against model error and prompt injection, not against a compromised
+agent runtime. For complete mediation, run the gate where the rail
+credentials live.
 """
 
 from __future__ import annotations
@@ -31,6 +41,7 @@ from typing import Any
 
 from ..enforce import enforce
 from ..models import Mandate
+from ..money import to_minor
 
 
 def guard(
@@ -40,6 +51,8 @@ def guard(
     payee_arg: str = "payee",
     amount_arg: str = "amount",
     currency_arg: str = "currency",
+    tx_id_arg: str = "tx_id",
+    amount_unit: str = "major",
     evidence_log=None,
     store=None,
     registry=None,
@@ -52,6 +65,8 @@ def guard(
         mandate: the mandate to enforce
         fn: the tool/function to protect — invoked only on allow
         payee_arg / amount_arg / currency_arg: kwarg names to extract from calls
+        tx_id_arg: kwarg carrying an idempotency key, if the tool has one
+        amount_unit: ``"major"`` (decimal, default) or ``"minor"`` (integer)
         evidence_log, store, registry, hooks: passed through to enforce()
         raise_on_deny: if True, raise PermissionError on denial instead of
             returning a dict (useful outside agent loops)
@@ -75,12 +90,13 @@ def guard(
         decision = enforce(
             mandate,
             payee=str(payee),
-            amount=float(amount),
+            amount=_to_gate_amount(amount, currency or mandate.bounds.currency, amount_unit),
             currency=currency,
             evidence_log=evidence_log,
             store=store,
             registry=registry,
             hooks=hooks,
+            tx_id=bound.get(tx_id_arg),
         )
         if not decision.allowed:
             if raise_on_deny:
@@ -97,6 +113,16 @@ def guard(
     wrapper.__doc__ = f"[mandate-gated] {getattr(fn, '__doc__', '') or ''}"
     wrapper.__wrapped__ = fn
     return wrapper
+
+
+def _to_gate_amount(amount, currency: str, unit: str):
+    if unit == "minor":
+        return amount
+    try:
+        # str() of a float is its shortest round-trip form, so 49.99 -> "49.99".
+        return to_minor(amount if isinstance(amount, str) else str(amount), currency)
+    except (TypeError, ValueError):
+        return amount  # the gate denies it as NON_POSITIVE; never round
 
 
 def _bind(fn: Callable, args: tuple, kwargs: dict) -> dict:
