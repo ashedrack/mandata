@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.7] — implements MMF-v0.3.7
+
+- **`claim` re-verifies expiry as well as revocation**, for every chain member, inside the claim's serialization (linearization point = the claim's commit).
+- **Unresolved open reservations consume budget at any age** — an AUTHORIZED/CLAIMED transaction that outlives the rolling window keeps counting until settled or voided. Spend records now carry a `resolved` flag, set by `settle` (SQLite schema migrates automatically).
+- **Optional signed-evidence conformance profile** — hash chain mandatory, signatures a defined opt-in profile.
+- **Typed-value request equality** — `1` and `1.0` compare integral-equal; different JSON types never equal.
+- 198 tests, 68 vectors (new L17/L18 cover the window-boundary semantics).
+
 ## [0.4.6] — implements MMF-v0.3.6
 
 - **`claim` re-verifies revocation** — an AUTHORIZED transaction of a revoked mandate (local flag or registry, fail-closed) can no longer be dispatched: the kill switch now reaches the dispatch point, not just new evaluations. `settle`/`void` proceed post-revocation (they record facts, not grants); replays return the historical decision.

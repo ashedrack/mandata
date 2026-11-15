@@ -57,6 +57,8 @@ class StateStore(Protocol):
 
     def record(self, mandate_id: str, timestamp: float, amount: int, tx_id: str) -> None: ...
     def release(self, mandate_id: str, tx_id: str) -> None: ...
+
+    def resolve(self, mandate_id: str, tx_id: str) -> None: ...
     def spend(self, mandate_id: str, since: float) -> tuple[int, int]:
         """Return (transaction_count, total_amount) since `since`."""
         ...
@@ -93,13 +95,25 @@ class InMemoryStore:
 
     def record(self, mandate_id: str, timestamp: float, amount: int, tx_id: str) -> None:
         with self._lock:
-            self._records.setdefault(mandate_id, []).append((timestamp, amount, tx_id, False))
+            self._records.setdefault(mandate_id, []).append(
+                (timestamp, amount, tx_id, False, False)
+            )
 
     def release(self, mandate_id: str, tx_id: str) -> None:
         with self._lock:
             rows = self._records.get(mandate_id, [])
             self._records[mandate_id] = [
-                (ts, a, tid, True if tid == tx_id else rel) for ts, a, tid, rel in rows
+                (ts, a, tid, True if tid == tx_id else rel, res)
+                for ts, a, tid, rel, res in rows
+            ]
+
+    def resolve(self, mandate_id: str, tx_id: str) -> None:
+        """Mark a transaction's reservations resolved (settled)."""
+        with self._lock:
+            rows = self._records.get(mandate_id, [])
+            self._records[mandate_id] = [
+                (ts, a, tid, rel, True if tid == tx_id else res)
+                for ts, a, tid, rel, res in rows
             ]
 
     def spend(self, mandate_id: str, since: float) -> tuple[int, int]:
@@ -108,11 +122,22 @@ class InMemoryStore:
         Velocity counts every authorization issued — released ones included:
         a voided payment still consumed an authorization slot, so rapid
         authorize-and-void cycling cannot evade the rate limit. Budget counts
-        only outstanding (unreleased) reservations.
+        unreleased reservations in the window, PLUS unresolved open
+        reservations at any age: a claim that outlives its window is still
+        money possibly committed, and must keep consuming budget until it is
+        settled or voided (MMF §5.1).
         """
         with self._lock:
-            rows = [r for r in self._records.get(mandate_id, []) if r[0] >= since]
-        return len(rows), sum(a for _, a, _, rel in rows if not rel)
+            rows = self._records.get(mandate_id, [])
+        issued = outstanding = 0
+        for ts, a, _, rel, res in rows:
+            if ts >= since:
+                issued += 1
+                if not rel:
+                    outstanding += a
+            elif not rel and not res:
+                outstanding += a
+        return issued, outstanding
 
     def get_tx(self, tx_id: str) -> TxRecord | None:
         with self._lock:
@@ -140,8 +165,21 @@ class SQLiteStore:
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS spend "
             "(mandate_id TEXT, ts REAL, amount INTEGER, tx_id TEXT, "
-            "released INTEGER NOT NULL DEFAULT 0)"
+            "released INTEGER NOT NULL DEFAULT 0, "
+            "resolved INTEGER NOT NULL DEFAULT 0)"
         )
+        # Upgrade older databases: existing rows predate lifecycle
+        # resolution tracking; mark spend resolved iff its transaction
+        # already reached a terminal state.
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(spend)")}
+        if "resolved" not in cols:
+            self._conn.execute(
+                "ALTER TABLE spend ADD COLUMN resolved INTEGER NOT NULL DEFAULT 0"
+            )
+            self._conn.execute(
+                "UPDATE spend SET resolved = 1 WHERE tx_id IN "
+                "(SELECT tx_id FROM txs WHERE status IN ('SETTLED','VOIDED','DENIED'))"
+            )
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(spend)")}
         if "tx_id" not in cols:  # migrate a pre-0.4 store
             self._conn.execute("ALTER TABLE spend ADD COLUMN tx_id TEXT")
@@ -188,7 +226,7 @@ class SQLiteStore:
     def record(self, mandate_id: str, timestamp: float, amount: int, tx_id: str) -> None:
         with self._lock:
             self._conn.execute(
-                "INSERT INTO spend (mandate_id, ts, amount, tx_id) VALUES (?, ?, ?, ?)",
+                "INSERT INTO spend (mandate_id, ts, amount, tx_id, resolved) VALUES (?, ?, ?, ?, 0)",
                 (mandate_id, timestamp, amount, tx_id),
             )
 
@@ -196,6 +234,14 @@ class SQLiteStore:
         with self._lock:
             self._conn.execute(
                 "UPDATE spend SET released = 1 WHERE mandate_id = ? AND tx_id = ?",
+                (mandate_id, tx_id),
+            )
+
+    def resolve(self, mandate_id: str, tx_id: str) -> None:
+        """Mark a transaction's reservations resolved (settled)."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE spend SET resolved = 1 WHERE mandate_id = ? AND tx_id = ?",
                 (mandate_id, tx_id),
             )
 

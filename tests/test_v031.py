@@ -132,7 +132,7 @@ def test_settle_and_void_accept_claimed():
     assert settle(m, "t1", at=1000).status == SETTLED
 
     enforce(m2, "x", 10, currency="GBP", tx_id="t2", evidence_log=EvidenceLog(), at=1000)
-    claim(m2, "t2", "x", 10, "GBP")
+    claim(m2, "t2", "x", 10, "GBP", at=1000)
     assert void(m2, "t2", at=1000, cancellation="rail-decline:confirmed").status == VOIDED
 
 

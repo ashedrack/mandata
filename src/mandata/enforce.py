@@ -221,6 +221,11 @@ def claim(
                 if node.revoked:
                     err = f"{_label(node, mandate)} revoked — authorization cannot be dispatched"
                     break
+            if err is None:
+                for node in chain:
+                    if node.is_expired(at):
+                        err = f"{_label(node, mandate)} expired — cannot dispatch"
+                        break
             if err is None and registry is not None:
                 for node in chain:
                     try:
@@ -367,6 +372,11 @@ def _transition(
                     (store or node._state).release(node.mandate_id, tx_id)
             tx = dataclasses.replace(tx, status=target)
             ledger.put_tx(tx)
+            if target == SETTLED:
+                # Resolved reservations age out of the budget window like any
+                # completed spend; unresolved ones keep consuming budget.
+                for node in chain:
+                    (store or node._state).resolve(node.mandate_id, tx_id)
             log.append(
                 mandate_id=mandate.mandate_id,
                 agent=mandate.agent,

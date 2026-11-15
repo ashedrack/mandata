@@ -89,8 +89,9 @@ def test_core_vector(v):
     m = build_mandate(v["mandate"])
     registry = build_registry(v.get("registry"))
     log = EvidenceLog()
-    for p in v.get("prior_txns", []):  # seed prior allowed spend
-        m.record(p["at"], p["amount"])
+    for p in v.get("prior_txns", []):  # seed prior completed (resolved) spend
+        m.record(p["at"], p["amount"], tx_id=f"prior-{p['at']}")
+        m._state.resolve(m.mandate_id, f"prior-{p['at']}")
 
     d = run(m, v["tx"], log, registry)
     assert (d.allowed, d.check) == (v["expect"]["allowed"], v["expect"]["check"]), d.reason
