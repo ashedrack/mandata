@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from nacl.exceptions import BadSignatureError
 from nacl.signing import SigningKey, VerifyKey
 
-from .models import Mandate, canonical_number
+from .models import Mandate, canonical_number, lp_fields
 
 
 def bounds_hash(mandate: Mandate) -> str:
@@ -25,19 +25,19 @@ def bounds_hash(mandate: Mandate) -> str:
     signature (MMF §6).
     """
     b = mandate.bounds
-    payload = "|".join(
-        [
-            mandate.principal,
-            canonical_number(mandate.issued_at),
-            mandate.parent_mandate_id or "",
-            str(b.max_amount),
-            b.currency,
-            ",".join(sorted(b.allowed_payees)),
-            str(b.expires_in_days),
-            str(b.velocity_limit),
-            "" if b.total_budget is None else str(b.total_budget),
-            str(b.budget_window_days),
-        ]
+    # Length-prefixed fields (same canonical form as evidence, MMF §5.6):
+    # unambiguous for any field value, byte-identical across languages.
+    payload = lp_fields(
+        mandate.principal,
+        canonical_number(mandate.issued_at),
+        mandate.parent_mandate_id or "",
+        str(b.max_amount),
+        b.currency,
+        ",".join(sorted(b.allowed_payees)),
+        str(b.expires_in_days),
+        str(b.velocity_limit),
+        "" if b.total_budget is None else str(b.total_budget),
+        str(b.budget_window_days),
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -58,7 +58,7 @@ class Credential:
 
 
 def _payload(mandate_id: str, agent: str, bh: str, expires_at: float) -> bytes:
-    return f"{mandate_id}|{agent}|{bh}|{canonical_number(expires_at)}".encode()
+    return lp_fields(mandate_id, agent, bh, canonical_number(expires_at)).encode()
 
 
 def issue_credential(mandate: Mandate, signing_key: SigningKey) -> Credential:

@@ -37,6 +37,21 @@ CHECKS = (
 EVENTS = ("DECISION", "REPLAY", "CLAIM", "REJECTED", "SETTLE", "VOID")
 
 
+def lp_field(value: str) -> str:
+    """One length-prefixed canonical field: ``<utf-8 byte length>:<utf-8>``.
+
+    Self-delimiting, so any field value (including ``|``) is unambiguous —
+    MMF §5.6's canonical form for evidence, credentials and mandate hashing.
+    """
+    v = unicodedata.normalize("NFC", value)
+    return f"{len(v.encode('utf-8'))}:{v}"
+
+
+def lp_fields(*values: str) -> str:
+    """Length-prefixed fields joined by ``|`` bytes."""
+    return "|".join(lp_field(v) for v in values)
+
+
 def canonical_number(x: float) -> str:
     """Language-neutral decimal rendering used in every MMF hash (MMF §5.2).
 
@@ -266,9 +281,7 @@ class EvidenceRecord:
             str(math.floor(self.timestamp * 1000 + 0.5)),
             self.prev_hash,
         ]
-        return "|".join(
-            f"{len(f.encode('utf-8'))}:{unicodedata.normalize('NFC', f)}" for f in fields
-        )
+        return lp_fields(*fields)
 
     @property
     def hash(self) -> str:

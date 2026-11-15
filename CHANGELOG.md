@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.8] — implements MMF-v0.3.8
+
+- **Length-prefixed canonicalization everywhere (breaking).** `bounds_hash` and the credential signature payload now use the same `len:value` form as evidence — a `|` inside `principal`, `agent`, `mandate_id` or a payee can no longer shift field boundaries and collide two different signed objects. Credentials issued by ≤0.4.7 do not verify under this version.
+- **`mandate_id` immutability + mandate preservation specified** — bound for life to one signed mandate object; the gate preserves the mandate for evidence interpretation.
+- **Timestamp edge cases specified** — finite only (NaN/±inf invalid), ms value fits int64, negatives serialize uniformly.
+- **Integral-equality rule defined** for typed request comparison.
+
 ## [0.4.7] — implements MMF-v0.3.7
 
 - **`claim` re-verifies expiry as well as revocation**, for every chain member, inside the claim's serialization (linearization point = the claim's commit).
