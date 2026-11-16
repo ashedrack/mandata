@@ -1,3 +1,19 @@
+## [0.4.20] — implements MMF-v0.3.20
+
+- No behavior change; the three behaviors below are now specified and
+  pinned by tests (91 vectors, 230 tests).
+- Spec: overflow rule scoped to the budget accumulator of members with
+  `total_budget`; unbudgeted mandates are unaffected; velocity counters are
+  exact counts. Test: 3 × (2^53 − 1) of spend on an unbudgeted mandate.
+- Spec: bounded registry wait; a registry timeout is a registry fault
+  (`REVOKED_REGISTRY` at enforce, `CLAIM:REGISTRY` at claim) and a rejected
+  claim leaves the transaction `AUTHORIZED` and retryable. Tests: a flaky
+  registry, and a real slow HTTP server bounded by a 0.2 s client timeout.
+- Spec: tamper evidence is not transaction truth.
+- **Correction**: the `ts/` directory was described as a "core port"; it is
+  a 59-line pre-v0.3 scaffold with none of the current protocol. README
+  files now say so.
+
 ## [0.4.19] — implements MMF-v0.3.19
 
 - Spec/documentation only; no behavior change (91 vectors, 227 tests).

@@ -523,3 +523,75 @@ def test_rail_idempotency_key_is_gate_scoped_deterministic_and_pinned():
     assert len(a) == 64
     with pytest.raises(ValueError):
         key("", "x")
+
+
+def test_claim_registry_failure_leaves_authorized_and_claim_can_be_retried():
+    class Flaky:
+        def __init__(self):
+            self.calls = 0
+
+        def is_revoked(self, mandate_id):
+            self.calls += 1
+            if self.calls == 1:
+                raise TimeoutError("registry timed out")
+            return False
+
+    m, log, reg = mk(), EvidenceLog(), Flaky()
+    enforce(m, "x", 10, currency="GBP", tx_id="rg1", evidence_log=log, at=1000)
+    with pytest.raises(LifecycleError):
+        claim(m, "rg1", "x", 10, "GBP", evidence_log=log, at=1001, registry=reg)
+    assert log.records[-1].event == "REJECTED" and log.records[-1].check == "CLAIM:REGISTRY"
+    assert m._state.get_tx("rg1").status == "AUTHORIZED"  # not consumed by the failure
+    assert claim(m, "rg1", "x", 10, "GBP", evidence_log=log, at=1002, registry=reg).status == "CLAIMED"
+
+
+def test_slow_http_registry_is_bounded_by_its_timeout_at_claim_and_enforce():
+    import http.server
+    import threading
+    import time
+
+    from mandata.revocation import HTTPRegistry
+
+    class Slow(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            time.sleep(1.5)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"revoked": false}')
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Slow)
+    srv.daemon_threads = True
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        reg = HTTPRegistry(f"http://127.0.0.1:{srv.server_address[1]}", timeout=0.2)
+        m, log = mk(), EvidenceLog()
+        t0 = time.perf_counter()
+        d = enforce(m, "x", 10, currency="GBP", tx_id="sl0", evidence_log=log, at=1000, registry=reg)
+        assert not d.allowed and d.check == "REVOKED_REGISTRY"
+        assert time.perf_counter() - t0 < 1.0  # bounded by the 0.2 s timeout, not the 1.5 s stall
+        enforce(m, "x", 10, currency="GBP", tx_id="sl1", evidence_log=log, at=1000)
+        t0 = time.perf_counter()
+        with pytest.raises(LifecycleError):
+            claim(m, "sl1", "x", 10, "GBP", evidence_log=log, at=1001, registry=reg)
+        assert time.perf_counter() - t0 < 1.0
+        assert log.records[-1].check == "CLAIM:REGISTRY"
+        assert m._state.get_tx("sl1").status == "AUTHORIZED"
+    finally:
+        srv.shutdown()
+
+
+def test_without_a_configured_budget_accumulated_spend_never_affects_decisions():
+    from mandata.money import MAX_AMOUNT
+
+    m = Mandate(principal="p", agent="a", bounds=Bounds(max_amount=MAX_AMOUNT))
+    log = EvidenceLog()
+    for i in range(3):  # cumulative authorized spend reaches 3 * (2^53 - 1)
+        d = enforce(m, "x", MAX_AMOUNT, currency="GBP", tx_id=f"big{i}", evidence_log=log, at=1000 + i)
+        assert d.allowed and d.check == "WITHIN"
+    capped = Mandate(principal="p", agent="a", bounds=Bounds(max_amount=MAX_AMOUNT, total_budget=MAX_AMOUNT))
+    assert enforce(capped, "x", MAX_AMOUNT, currency="GBP", tx_id="c0", evidence_log=log, at=1000).allowed
+    d = enforce(capped, "x", 1, currency="GBP", tx_id="c1", evidence_log=log, at=1001)
+    assert not d.allowed and d.check == "BUDGET"  # the bound is exact at the 2^53 - 1 edge

@@ -86,6 +86,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [x] **v0.4.5** — [MMF-v0.3.5](spec/mmf-v0.3.5.md): three-level dispatch guarantee formalized (claim / trusted dispatcher / rail), normative evidence serialization table (types, nulls, NFC, encodings), evidence obligations scoped to completed durably-committed evaluations
 - [x] **v0.4.6** — [MMF-v0.3.6](spec/mmf-v0.3.6.md): revocation re-verified at `claim` (a revoked mandate's unclaimed authorization cannot be dispatched); per-state revocation policy; principal-authorized delegation model stated; exact unnormalized request equality
 - [x] **v0.4.7** — [MMF-v0.3.7](spec/mmf-v0.3.7.md): `claim` re-verifies revocation AND expiry chain-wide (linearization = claim commit); unresolved open reservations consume budget at any age (L17/L18); optional signed-evidence conformance profile; typed-value request equality — 68 vectors
+- [x] **v0.4.20** — [MMF-v0.3.20](spec/mmf-v0.3.20.md): overflow-rule scope; bounded registry wait (timeout = registry fault, claim stays AUTHORIZED); tamper evidence ≠ transaction truth — no behavior change
 - [x] **v0.4.19** — [MMF-v0.3.19](spec/mmf-v0.3.19.md): invalid-amount trade-off stated; rail-key default profile and `gate_id` requirements — documentation only
 - [x] **v0.4.18** — [MMF-v0.3.18](spec/mmf-v0.3.18.md): corrected request-equality/ledger text to the actual behavior (V31–V35, L29); gate-scoped `rail_idempotency_key`; optional `verify_cancellation` — 91 vectors
 - [x] **v0.4.17** — [MMF-v0.3.17](spec/mmf-v0.3.17.md): cross-mandate TX_CONFLICT evidence; rail idempotency-key rule; normative window arithmetic (inclusive lower bound) — vectors L27, L28, D18 — 85 vectors
@@ -98,7 +99,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [x] **v0.4.10** — [MMF-v0.3.10](spec/mmf-v0.3.10.md): resolution-failure-as-result ordering; fixed REJECTED cause precedence; exact-bytes evidence (NFC removed); negative credential vectors C02–C06 — 74 vectors
 - [x] **v0.4.9** — [MMF-v0.3.9](spec/mmf-v0.3.9.md): ledger-lookup-first ordering made structural (chain re-resolved under serialization); normative `<OP>:<CAUSE>` on REJECTED evidence; cancellation-reference binding rules; credential golden vector C01 — 69 vectors
 - [x] **v0.4.8** — [MMF-v0.3.8](spec/mmf-v0.3.8.md): unified length-prefixed canonicalization for credentials + bounds_hash (delimiter-smuggling closed); `mandate_id` immutable-for-life + durable mandate preservation; timestamp edge cases; typed-equality integral rule
-- [ ] TypeScript implementation (core gate scaffold only — not yet MMF-v0.3.8 conformant)
+- [ ] TypeScript implementation — `ts/` is a 59-line pre-v0.3 scaffold, **not** an MMF implementation (never run against the vectors)
 
 ## Research
 
