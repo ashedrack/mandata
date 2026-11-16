@@ -423,3 +423,43 @@ def test_decided_transaction_replays_after_chain_becomes_invalid():
     assert d2.replayed and d2.allowed and d2.check == "WITHIN"
     d3 = enforce(child, "x", 10, currency="GBP", tx_id="t2", evidence_log=log, at=1002)
     assert not d3.allowed and d3.check == "INVALID_CHAIN"
+
+
+def test_structural_attenuation_implies_child_history_acceptable_to_parent():
+    """Structural attenuation (cap <=, window >=) means any history the child
+    policy accepts on its own is also accepted by the parent policy standing
+    alone — checked over random settled/unresolved histories."""
+    import random
+
+    rng = random.Random(20260101)
+    day = 86400
+    for _ in range(200):
+        wp = rng.choice([1, 2, 3])
+        wc = wp + rng.choice([0, 1, 2])
+        bp = rng.randint(60, 150)
+        bc = rng.randint(20, bp)
+        parent = Mandate(
+            principal="p",
+            agent="a",
+            bounds=Bounds(max_amount=bp, total_budget=bp, budget_window_days=wp, expires_in_days=30),
+        )
+        child = Mandate(
+            principal="p",
+            agent="a",
+            bounds=Bounds(max_amount=bc, total_budget=bc, budget_window_days=wc, expires_in_days=30),
+        )
+        t = 0.0
+        for i in range(rng.randint(3, 12)):
+            t += rng.uniform(0, 1.5 * day)
+            amt = rng.randint(1, bc)
+            dc = enforce(child, "x", amt, currency="GBP", tx_id=f"c{i}", evidence_log=EvidenceLog(), at=t)
+            if not dc.allowed:
+                continue
+            if rng.random() < 0.7:
+                claim(child, f"c{i}", "x", amt, "GBP", evidence_log=EvidenceLog(), at=t)
+                settle(child, f"c{i}", evidence_log=EvidenceLog(), at=t)
+            dp = enforce(parent, "x", amt, currency="GBP", tx_id=f"c{i}", evidence_log=EvidenceLog(), at=t)
+            assert dp.allowed, (wp, wc, bp, bc, i)
+            if parent._state.get_tx(f"c{i}").status == "AUTHORIZED" and child._state.get_tx(f"c{i}").status == "SETTLED":
+                claim(parent, f"c{i}", "x", amt, "GBP", evidence_log=EvidenceLog(), at=t)
+                settle(parent, f"c{i}", evidence_log=EvidenceLog(), at=t)

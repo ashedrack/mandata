@@ -1,3 +1,12 @@
+## [0.4.15] — implements MMF-v0.3.15
+
+- Spec: structural vs effective delegation attenuation defined over
+  accepted histories; standalone budget implication argued and checked by a
+  randomized test (200 histories; fails when the window is narrowed).
+- Spec: `settle` wording aligned with the idempotent rule; forensic limit of
+  malformed-amount evidence; explicit atomic-commit rule.
+- No behavior change — 76 vectors, 209 tests.
+
 ## [0.4.14] — implements MMF-v0.3.14
 
 - Replay-first order made structural: authoritative chain re-resolution now
