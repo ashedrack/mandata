@@ -8,7 +8,7 @@ from .money import from_minor, register_currency, to_minor
 from .revocation import HTTPRegistry, InMemoryRegistry, RevocationRegistry
 from .state import InMemoryStore, SQLiteStore, StateStore, TxRecord
 
-__version__ = "0.4.12"
+__version__ = "0.4.13"
 __all__ = [
     "CHECKS",
     "EVENTS",

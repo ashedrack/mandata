@@ -1,3 +1,11 @@
+## [0.4.13] — implements MMF-v0.3.13
+
+- Spec-only semantic clarifications (no behavior change): adapter binding
+  constrains what is submitted, not what the rail executes; repeated
+  `settle`/`void` append no evidence (no `REPLAY`); ten failure checks vs
+  the `WITHIN` outcome; hash determinism stated as serialization
+  determinism.
+
 ## [0.4.12] — implements MMF-v0.3.12
 
 - Revocation guarantee at `claim` stated precisely: relative to state
