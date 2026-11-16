@@ -1,3 +1,19 @@
+## [0.4.11] — implements MMF-v0.3.11
+
+- **`settle` requires `CLAIMED`**: settling an `AUTHORIZED` (never-dispatched)
+  transaction is now rejected as `SETTLE:STATUS` — nothing was sent to the
+  rail, so nothing can settle. L06 and lifecycle tests updated to claim
+  first.
+- **Split rejection precedence**: `SETTLE` and `VOID` now have separate
+  precedence rules (VOID additionally checks `CANCELLATION`); claim ordering
+  distinguishes `REVOKED` (embedded) → `EXPIRED` → `REVOKED_REGISTRY`
+  (registry-reported) → `REGISTRY` (fault), matching evaluation order — a
+  registry that cannot answer cannot establish revocation.
+- **Evidence fidelity qualified**: out-of-range amounts serialize as
+  `invalid`; the ledger's typed request retains the full distinction.
+- Lifecycle state diagram now shows `CLAIMED → SETTLED` and
+  `CLAIMED → VOIDED` as distinct labeled transitions.
+
 ## [0.4.10] — implements MMF-v0.3.10
 
 - **Resolution failure is a result, never an exception**: preliminary chain

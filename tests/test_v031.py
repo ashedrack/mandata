@@ -201,10 +201,11 @@ def test_evidence_persists_and_reloads(tmp_path):
     log = EvidenceLog(store=store)
     d = enforce(m, "x", 10, currency="GBP", tx_id="t1", store=store, evidence_log=log, at=1000)
     assert d.allowed
+    claim(m, "t1", "x", 10, "GBP", store=store, evidence_log=log, at=1000)
     settle(m, "t1", store=store, evidence_log=log, at=1000)
 
     reloaded = EvidenceLog(store=store)
-    assert [r.event for r in reloaded.records] == ["DECISION", "SETTLE"]
+    assert [r.event for r in reloaded.records] == ["DECISION", "CLAIM", "SETTLE"]
     assert reloaded.verify_chain()
     assert reloaded.records[0].hash == log.records[0].hash
 
