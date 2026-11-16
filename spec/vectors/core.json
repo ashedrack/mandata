@@ -717,6 +717,121 @@
         "allowed": false,
         "check": "CURRENCY"
       }
+    },
+    {
+      "id": "V31",
+      "desc": "amount token 1.0 has a fractional part in its lexical form: not an integer, so NON_POSITIVE",
+      "mandate": {
+        "bounds": {
+          "max_amount": 500,
+          "currency": "GBP",
+          "allowed_payees": [],
+          "expires_in_days": 30,
+          "velocity_limit": 0
+        }
+      },
+      "tx": {
+        "payee": "x",
+        "amount_json": "1.0",
+        "currency": "GBP",
+        "at": 1000
+      },
+      "expect": {
+        "allowed": false,
+        "check": "NON_POSITIVE"
+      }
+    },
+    {
+      "id": "V32",
+      "desc": "amount token 1e0 has an exponent: not an integer token, so NON_POSITIVE",
+      "mandate": {
+        "bounds": {
+          "max_amount": 500,
+          "currency": "GBP",
+          "allowed_payees": [],
+          "expires_in_days": 30,
+          "velocity_limit": 0
+        }
+      },
+      "tx": {
+        "payee": "x",
+        "amount_json": "1e0",
+        "currency": "GBP",
+        "at": 1000
+      },
+      "expect": {
+        "allowed": false,
+        "check": "NON_POSITIVE"
+      }
+    },
+    {
+      "id": "V33",
+      "desc": "amount token -0 is zero: not positive, so NON_POSITIVE",
+      "mandate": {
+        "bounds": {
+          "max_amount": 500,
+          "currency": "GBP",
+          "allowed_payees": [],
+          "expires_in_days": 30,
+          "velocity_limit": 0
+        }
+      },
+      "tx": {
+        "payee": "x",
+        "amount_json": "-0",
+        "currency": "GBP",
+        "at": 1000
+      },
+      "expect": {
+        "allowed": false,
+        "check": "NON_POSITIVE"
+      }
+    },
+    {
+      "id": "V34",
+      "desc": "amount token 9007199254740992 (2^53) exceeds the maximum 2^53-1: NON_POSITIVE",
+      "mandate": {
+        "bounds": {
+          "max_amount": 9007199254740991,
+          "currency": "GBP",
+          "allowed_payees": [],
+          "expires_in_days": 30,
+          "velocity_limit": 0
+        }
+      },
+      "tx": {
+        "payee": "x",
+        "amount_json": "9007199254740992",
+        "currency": "GBP",
+        "at": 1000
+      },
+      "expect": {
+        "allowed": false,
+        "check": "NON_POSITIVE"
+      }
+    },
+    {
+      "id": "V35",
+      "desc": "amount token 9007199254740991 (2^53-1) is the maximum valid amount: WITHIN",
+      "mandate": {
+        "bounds": {
+          "max_amount": 9007199254740991,
+          "currency": "GBP",
+          "allowed_payees": [],
+          "expires_in_days": 30,
+          "velocity_limit": 0
+        }
+      },
+      "tx": {
+        "payee": "x",
+        "amount_json": "9007199254740991",
+        "currency": "GBP",
+        "at": 1000
+      },
+      "expect": {
+        "allowed": true,
+        "check": "WITHIN"
+      }
     }
   ]
 }

@@ -326,6 +326,7 @@ def void(
     at: float | None = None,
     clock: Callable[[], float] = time.time,
     cancellation: str | None = None,
+    verify_cancellation: Callable[[str, TxRecord], bool] | None = None,
 ) -> TxRecord:
     """Release an AUTHORIZED or CLAIMED transaction that will never settle.
 
@@ -348,11 +349,14 @@ def void(
     Idempotent for already-voided transactions. A SETTLED transaction cannot
     be voided: refunds are a rail concern (MMF §8).
     """
-    return _transition(mandate, tx_id, VOIDED, evidence_log, store, at, clock, cancellation)
+    return _transition(
+        mandate, tx_id, VOIDED, evidence_log, store, at, clock, cancellation, verify_cancellation
+    )
 
 
 def _transition(
-    mandate, tx_id, target, evidence_log, store, at, clock, cancellation=None
+    mandate, tx_id, target, evidence_log, store, at, clock, cancellation=None,
+    verify_cancellation=None,
 ) -> TxRecord:
     at = clock() if at is None else at
     log = evidence_log or _DEFAULT_LOG
@@ -388,6 +392,20 @@ def _transition(
                 "outcome stays CLAIMED"
             )
             cause = "CANCELLATION"
+        elif target == VOIDED and tx.status == CLAIMED and verify_cancellation is not None:
+            # Optional validation by the trusted component named in MMF §5.4:
+            # the reference must bind to THIS transaction's rail instruction.
+            # A verifier fault is a failed validation — fail closed.
+            try:
+                bound = bool(verify_cancellation(cancellation, tx))
+            except Exception:  # noqa: BLE001 — a verifier fault never releases a reservation
+                bound = False
+            if not bound:
+                err = (
+                    f"cancellation reference for {tx_id} failed validation — the "
+                    "reservation stays held while the in-flight outcome is unconfirmed"
+                )
+                cause = "CANCELLATION"
         if err is not None:
             # Rejected transitions are security evidence too (R6): a settle
             # attempt on a denied or voided transaction is exactly the kind
