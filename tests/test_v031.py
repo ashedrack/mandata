@@ -482,3 +482,44 @@ def test_cross_mandate_rejection_does_not_copy_foreign_transaction_into_evidence
     assert settle_rec.status == "" and claim_rec.status == ""
     assert claim_rec.payee == "x" and claim_rec.amount == 1  # attempted instruction
     assert a._state is not b._state
+
+
+def test_void_verifier_rejects_reference_not_bound_to_instruction_and_fails_closed():
+    m, log = mk(), EvidenceLog()
+    enforce(m, "x", 10, currency="GBP", tx_id="rk1", evidence_log=log, at=1000)
+    claim(m, "rk1", "x", 10, "GBP", evidence_log=log, at=1000)
+
+    def bound_to_this_tx(ref, tx):
+        return ref == f"decline:{tx.tx_id}"
+
+    with pytest.raises(LifecycleError):
+        void(m, "rk1", evidence_log=log, at=1001, cancellation="decline:OTHER-TX",
+             verify_cancellation=bound_to_this_tx)
+    assert log.records[-1].check == "VOID:CANCELLATION" and log.records[-1].event == "REJECTED"
+    assert m._state.get_tx("rk1").status == "CLAIMED"  # reservation still held
+
+    def crashing(ref, tx):
+        raise RuntimeError("verifier down")
+
+    with pytest.raises(LifecycleError):
+        void(m, "rk1", evidence_log=log, at=1002, cancellation="decline:rk1",
+             verify_cancellation=crashing)
+    assert m._state.get_tx("rk1").status == "CLAIMED"
+
+    assert void(m, "rk1", evidence_log=log, at=1003, cancellation="decline:rk1",
+                verify_cancellation=bound_to_this_tx).status == "VOIDED"
+    assert log.records[-1].event == "VOID" and log.records[-1].reference == "decline:rk1"
+
+
+def test_rail_idempotency_key_is_gate_scoped_deterministic_and_pinned():
+    from mandata import rail_idempotency_key as key
+
+    a = key("gate-A", "order-8812")
+    assert a == key("gate-A", "order-8812")  # stable across retries
+    assert a != key("gate-B", "order-8812")  # two gates, one rail namespace: no collision
+    assert a == "775592f0ba01f12db46f3b0001c581ad8a8c8b2075d065512b377139ac505cbf"
+    assert key("gate-A", "order-8812", hashed=False) == "6:gate-A|10:order-8812"
+    assert key("a|b", "c") != key("a", "b|c")  # delimiter-safe (injective form)
+    assert len(a) == 64
+    with pytest.raises(ValueError):
+        key("", "x")

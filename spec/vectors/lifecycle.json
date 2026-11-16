@@ -1646,6 +1646,106 @@
         "DECISION",
         "DECISION"
       ]
+    },
+    {
+      "id": "L29",
+      "desc": "request equality for amounts: a valid amount equals only the same integer; EVERY invalid amount (1.0, 1e0, 49.99, -7 ...) is one equivalence class \u2014 identical-class retries replay the stored denial, and a valid amount never equals an invalid one",
+      "mandate": {
+        "bounds": {
+          "max_amount": 500
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount_json": "1",
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount_json": "1.0",
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "TX_CONFLICT"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount_json": "1.0",
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "NON_POSITIVE",
+            "replayed": false
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount_json": "1e0",
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "NON_POSITIVE",
+            "replayed": true
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount_json": "-7",
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "NON_POSITIVE",
+            "replayed": true
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount_json": "1",
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "TX_CONFLICT"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "DECISION",
+        "DECISION",
+        "REPLAY",
+        "REPLAY",
+        "DECISION"
+      ]
     }
   ]
 }

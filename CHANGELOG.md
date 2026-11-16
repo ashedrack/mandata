@@ -1,3 +1,22 @@
+## [0.4.18] — implements MMF-v0.3.18
+
+- **Documentation correction (no behavior change to amount handling)**:
+  specs v0.3.6–v0.3.17 and the paper described request equality and the
+  ledger incorrectly. The reference never treated `49.99`, `"49.99"` and
+  `4999` as three distinct requests, never treated `1` and `1.0` as equal,
+  and never retained which malformed amount was submitted. Actual, fail-
+  closed behavior: valid amount = same integer; every invalid amount is one
+  equivalence class. Now specified (§3.1 lexical classification, §5.3
+  equality classes) and pinned by vectors V31–V35 and L29; a mutation that
+  accepts integral floats fails them.
+- **New**: `rail_idempotency_key(gate_id, tx_id)` — gate-scoped,
+  collision-resistant, deterministic rail key (SHA-256 of the
+  length-prefixed form; pinned test value).
+- **New**: optional `verify_cancellation` callback on `void()`; a verifier
+  that returns false or raises rejects as `VOID:CANCELLATION` and the
+  transaction stays `CLAIMED`.
+- 91 vectors, 227 tests.
+
 ## [0.4.17] — implements MMF-v0.3.17
 
 - No behavior change: the reference already satisfied every rule below;

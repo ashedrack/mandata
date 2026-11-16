@@ -5,10 +5,11 @@ from .enforce import LifecycleError, claim, enforce, settle, void
 from .evidence import EvidenceLog
 from .models import CHECKS, EVENTS, Bounds, Decision, EvidenceRecord, Mandate, canonical_number
 from .money import from_minor, register_currency, to_minor
+from .railkey import rail_idempotency_key
 from .revocation import HTTPRegistry, InMemoryRegistry, RevocationRegistry
 from .state import InMemoryStore, SQLiteStore, StateStore, TxRecord
 
-__version__ = "0.4.17"
+__version__ = "0.4.18"
 __all__ = [
     "CHECKS",
     "EVENTS",
@@ -30,6 +31,7 @@ __all__ = [
     "delegate",
     "enforce",
     "from_minor",
+    "rail_idempotency_key",
     "register_currency",
     "settle",
     "to_minor",

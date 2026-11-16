@@ -73,10 +73,13 @@ def build_registry(spec: dict | None):
 
 
 def run(m, tx, log, registry=None):
+    # "amount_json" carries the amount as raw JSON text, so lexical forms such
+    # as 1.0, 1e0 and -0 reach the gate exactly as a wire parser would yield them.
+    amount = json.loads(tx["amount_json"]) if "amount_json" in tx else tx["amount"]
     return enforce(
         m,
         tx["payee"],
-        tx["amount"],
+        amount,
         tx.get("currency"),
         at=tx["at"],
         evidence_log=log,
