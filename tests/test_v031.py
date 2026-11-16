@@ -394,3 +394,18 @@ def test_claim_after_revocation_registry_fails_closed():
     enforce(m, "x", 10, "GBP", tx_id="t1", at=1000, evidence_log=log, registry=Reg())
     with pytest.raises(LifecycleError):
         claim(m, "t1", "x", 10, "GBP", evidence_log=log, at=1001, registry=Reg())
+
+
+def test_repeated_void_and_settle_append_no_evidence():
+    m, log = mk(), EvidenceLog()
+    enforce(m, "x", 10, currency="GBP", tx_id="v1", evidence_log=log, at=1000)
+    void(m, "v1", evidence_log=log, at=1000)
+    n = len(log.records)
+    assert void(m, "v1", evidence_log=log, at=1001).status == "VOIDED"
+    assert len(log.records) == n
+    enforce(m, "x", 10, currency="GBP", tx_id="s1", evidence_log=log, at=1000)
+    claim(m, "s1", "x", 10, "GBP", evidence_log=log, at=1000)
+    settle(m, "s1", evidence_log=log, at=1000)
+    n = len(log.records)
+    assert settle(m, "s1", evidence_log=log, at=1001).status == SETTLED
+    assert len(log.records) == n
