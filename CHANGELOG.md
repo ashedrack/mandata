@@ -1,3 +1,14 @@
+## [0.4.14] — implements MMF-v0.3.14
+
+- Replay-first order made structural: authoritative chain re-resolution now
+  runs only for *new* `tx_id`s, so a decided transaction never depends on
+  the current chain. New test: an allowed transaction replays after its
+  chain becomes invalid; a new one denies `INVALID_CHAIN`.
+- Spec: idempotent settle/void step precedes `STATUS` in the rejection
+  precedence; new vector L20 — 76 vectors, 208 tests.
+- Spec: claim vs authorization precedence distinction, lock-planning rule,
+  raw `REFERENCE` retention.
+
 ## [0.4.13] — implements MMF-v0.3.13
 
 - Spec-only semantic clarifications (no behavior change): adapter binding

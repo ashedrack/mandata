@@ -409,3 +409,17 @@ def test_repeated_void_and_settle_append_no_evidence():
     n = len(log.records)
     assert settle(m, "s1", evidence_log=log, at=1001).status == SETTLED
     assert len(log.records) == n
+
+
+def test_decided_transaction_replays_after_chain_becomes_invalid():
+    parent = mk(max_amount=1000)
+    child = delegate(parent, "a-sub", Bounds(max_amount=500), at=0)
+    log = EvidenceLog()
+    d = enforce(child, "x", 10, currency="GBP", tx_id="t1", evidence_log=log, at=1000)
+    assert d.allowed
+    child.parent_mandate_id = "missing"
+    child._parent = None
+    d2 = enforce(child, "x", 10, currency="GBP", tx_id="t1", evidence_log=log, at=1001)
+    assert d2.replayed and d2.allowed and d2.check == "WITHIN"
+    d3 = enforce(child, "x", 10, currency="GBP", tx_id="t2", evidence_log=log, at=1002)
+    assert not d3.allowed and d3.check == "INVALID_CHAIN"
