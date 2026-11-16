@@ -81,10 +81,16 @@ def enforce(
         # re-resolve inside the serialization and fail closed if the chain
         # identity changed, so a replay can never be shadowed by graph edits.
         prior = ledger.get_tx(tx_id)
-        chain2, chain2_err2 = mandate.resolve_chain()
-        if [n.mandate_id for n in (chain2 or [])] != [n.mandate_id for n in chain]:
-            chain_error = chain_error or chain2_err2 or "delegation chain mutated during evaluation"
-            chain = chain2 or [mandate]
+        if prior is None:
+            # Authoritative resolution applies to NEW transactions only: a
+            # decided tx_id (replay or conflict) never depends on the
+            # current chain. The lock set was planned from the preliminary
+            # resolution; an identity change means link immutability was
+            # violated, so fail closed rather than acquire further locks.
+            chain2, chain2_err2 = mandate.resolve_chain()
+            if [n.mandate_id for n in (chain2 or [])] != [n.mandate_id for n in chain]:
+                chain_error = chain_error or chain2_err2 or "delegation chain mutated during evaluation"
+                chain = chain2 or [mandate]
         replayed = False
         if prior is not None and prior.same_request(
             mandate.mandate_id, payee, stored_amount, currency

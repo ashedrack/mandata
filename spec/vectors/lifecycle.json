@@ -1117,6 +1117,91 @@
         "SETTLE",
         "DECISION"
       ]
+    },
+    {
+      "id": "L20",
+      "desc": "repeated settle and repeated void on their target states are idempotent no-ops: unchanged result, no evidence record, no rejection",
+      "mandate": {
+        "bounds": {
+          "max_amount": 500,
+          "total_budget": 100
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 30,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 30,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "status": "CLAIMED"
+          }
+        },
+        {
+          "settle": "t1",
+          "at": 1002,
+          "expect": {
+            "status": "SETTLED"
+          }
+        },
+        {
+          "settle": "t1",
+          "at": 1003,
+          "expect": {
+            "status": "SETTLED"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount": 30,
+            "at": 1004,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "void": "t2",
+          "at": 1005,
+          "expect": {
+            "status": "VOIDED"
+          }
+        },
+        {
+          "void": "t2",
+          "at": 1006,
+          "expect": {
+            "status": "VOIDED"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "CLAIM",
+        "SETTLE",
+        "DECISION",
+        "VOID"
+      ]
     }
   ]
 }
