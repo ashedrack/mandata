@@ -28,6 +28,26 @@ class LifecycleError(ValueError):
     """An invalid settlement-lifecycle transition (unknown tx, settle after void, ...)."""
 
 
+def _check_scalars(**fields) -> None:
+    """Refuse request strings that cannot enter canonical serialization.
+
+    Every string bound for a canonical field MUST be a Unicode scalar
+    sequence (MMF §5.6): an unpaired surrogate or a non-string is malformed
+    input, rejected before evaluation — no decision and no evidence record.
+    Recorded unchecked, such a value could never be serialized and would
+    fail every subsequent chain hash instead.
+    """
+    for name, value in fields.items():
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise TypeError(f"{name} must be a string, got {value!r}")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as e:
+            raise ValueError(f"{name} is not a Unicode scalar sequence: {value!r}") from e
+
+
 def enforce(
     mandate: Mandate,
     payee: str,
@@ -70,6 +90,12 @@ def enforce(
         raise ValueError(f"evaluation time must be a finite number, got {at!r}")
     log = evidence_log or _DEFAULT_LOG
     tx_id = tx_id or uuid.uuid4().hex
+    # Malformed request strings are refused before any evaluation or ledger
+    # access (MMF §5.6): they could never be canonicalized into evidence.
+    _check_scalars(
+        tx_id=tx_id, payee=payee, currency=currency,
+        mandate_id=mandate.mandate_id, agent=mandate.agent,
+    )
     chain, chain_error = mandate.resolve_chain()
     ledger = store or mandate._state
     stored_amount = amount if is_minor_amount(amount) else None
@@ -215,6 +241,10 @@ def claim(
     """
     at = clock() if at is None else at
     log = evidence_log or _DEFAULT_LOG
+    _check_scalars(
+        tx_id=tx_id, payee=payee, currency=currency,
+        mandate_id=mandate.mandate_id, agent=mandate.agent,
+    )
     chain, chain_error = mandate.resolve_chain()
     if chain_error is not None:
         raise LifecycleError(chain_error)
@@ -360,6 +390,10 @@ def _transition(
 ) -> TxRecord:
     at = clock() if at is None else at
     log = evidence_log or _DEFAULT_LOG
+    _check_scalars(
+        tx_id=tx_id, cancellation=cancellation,
+        mandate_id=mandate.mandate_id, agent=mandate.agent,
+    )
     chain, chain_error = mandate.resolve_chain()
     if chain_error is not None:
         raise LifecycleError(chain_error)
