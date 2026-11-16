@@ -1,3 +1,12 @@
+## [0.4.12] — implements MMF-v0.3.12
+
+- Revocation guarantee at `claim` stated precisely: relative to state
+  visible during serialized validation; registry propagation delay is
+  outside the protocol guarantee.
+- Budget aging rule made explicit (by authorization timestamp) and covered
+  by new lifecycle vector L19 — 75 vectors, 205 tests.
+- Evidence hash-binding statement aligned with the `invalid` amount marker.
+
 ## [0.4.11] — implements MMF-v0.3.11
 
 - **`settle` requires `CLAIMED`**: settling an `AUTHORIZED` (never-dispatched)

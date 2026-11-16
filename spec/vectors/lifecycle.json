@@ -1039,6 +1039,84 @@
         "SETTLE",
         "DECISION"
       ]
+    },
+    {
+      "id": "L19",
+      "desc": "a reservation that settles after its window ages out by its AUTHORIZATION timestamp: it blocks while unresolved and stops counting the moment it settles",
+      "mandate": {
+        "bounds": {
+          "max_amount": 500,
+          "total_budget": 100,
+          "budget_window_days": 1
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP"
+          },
+          "at": 90000,
+          "expect": {
+            "status": "CLAIMED"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount": 50,
+            "at": 100000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "BUDGET"
+          }
+        },
+        {
+          "settle": "t1",
+          "at": 100500,
+          "expect": {
+            "status": "SETTLED"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t3",
+            "payee": "x",
+            "amount": 50,
+            "at": 101000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "CLAIM",
+        "DECISION",
+        "SETTLE",
+        "DECISION"
+      ]
     }
   ]
 }
