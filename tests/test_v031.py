@@ -595,3 +595,45 @@ def test_without_a_configured_budget_accumulated_spend_never_affects_decisions()
     assert enforce(capped, "x", MAX_AMOUNT, currency="GBP", tx_id="c0", evidence_log=log, at=1000).allowed
     d = enforce(capped, "x", 1, currency="GBP", tx_id="c1", evidence_log=log, at=1001)
     assert not d.allowed and d.check == "BUDGET"  # the bound is exact at the 2^53 - 1 edge
+
+
+def test_registry_wait_one_timeout_on_fault_but_scales_with_depth_when_answering_slowly():
+    import http.server
+    import threading
+    import time
+
+    from mandata.revocation import HTTPRegistry
+
+    class H(http.server.BaseHTTPRequestHandler):
+        delay = 1.5
+
+        def do_GET(self):
+            time.sleep(H.delay)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"revoked": false}')
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    srv.daemon_threads = True
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        chain = [Mandate(principal="p", agent="a", bounds=Bounds(max_amount=500))]
+        for i in range(4):
+            chain.append(delegate(chain[-1], f"a{i}", Bounds(max_amount=400 - i), at=0))
+        leaf = chain[-1]
+        reg = HTTPRegistry(f"http://127.0.0.1:{srv.server_address[1]}", timeout=0.2)
+
+        H.delay = 1.5  # stalls past the timeout: the first fault ends evaluation
+        t0 = time.perf_counter()
+        d = enforce(leaf, "x", 10, currency="GBP", tx_id="f", evidence_log=EvidenceLog(), at=1000, registry=reg)
+        assert d.check == "REVOKED_REGISTRY" and time.perf_counter() - t0 < 1.0
+
+        H.delay = 0.15  # answers inside the timeout every time: wait sums over the chain
+        t0 = time.perf_counter()
+        d = enforce(leaf, "x", 10, currency="GBP", tx_id="s", evidence_log=EvidenceLog(), at=1000, registry=reg)
+        assert d.allowed and time.perf_counter() - t0 >= 5 * 0.15 * 0.9
+    finally:
+        srv.shutdown()

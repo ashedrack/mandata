@@ -1,3 +1,15 @@
+## [0.4.21] — implements MMF-v0.3.21
+
+- No behavior change (91 vectors, 231 tests).
+- Spec: the registry wait bound is per consultation. A fault ends evaluation
+  (cost ≤ one wait; measured 0.22 s at a 0.2 s timeout over a depth-5
+  chain); a registry answering slowly inside the bound costs up to N × wait
+  (measured 0.78 s for 5 × 0.15 s). An overall evaluation deadline is a
+  SHOULD and is **not yet implemented** in the reference.
+- Spec: a retry under a new `tx_id` has a different rail key; a replacement
+  MUST NOT be authorized unless the original is established unable to
+  execute (void with a validated cancellation reference first).
+
 ## [0.4.20] — implements MMF-v0.3.20
 
 - No behavior change; the three behaviors below are now specified and

@@ -9,7 +9,7 @@ from .railkey import rail_idempotency_key
 from .revocation import HTTPRegistry, InMemoryRegistry, RevocationRegistry
 from .state import InMemoryStore, SQLiteStore, StateStore, TxRecord
 
-__version__ = "0.4.20"
+__version__ = "0.4.21"
 __all__ = [
     "CHECKS",
     "EVENTS",
