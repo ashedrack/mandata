@@ -1494,6 +1494,158 @@
         "REJECTED",
         "SETTLE"
       ]
+    },
+    {
+      "id": "L27",
+      "desc": "a different mandate reusing an existing tx_id denies TX_CONFLICT; the conflict evidence carries the ATTEMPTING mandate and its submitted instruction, never the stored mandate's, and the stored entry is unchanged",
+      "mandate": {
+        "mandate_id": "mA",
+        "agent": "a",
+        "bounds": {
+          "max_amount": 500
+        }
+      },
+      "mandate2": {
+        "mandate_id": "mB",
+        "agent": "b",
+        "bounds": {
+          "max_amount": 500
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "secret.example",
+            "amount": 123,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "other.example",
+            "amount": 7,
+            "at": 1001,
+            "currency": "GBP",
+            "as": "m2"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "TX_CONFLICT",
+            "status": "DENIED",
+            "record": {
+              "mandate_id": "mB",
+              "agent": "b",
+              "payee": "other.example",
+              "amount": 7,
+              "currency": "GBP",
+              "status": "DENIED",
+              "check": "TX_CONFLICT"
+            }
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "secret.example",
+            "amount": 123,
+            "currency": "GBP"
+          },
+          "at": 1002,
+          "expect": {
+            "status": "CLAIMED"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "DECISION",
+        "CLAIM"
+      ]
+    },
+    {
+      "id": "L28",
+      "desc": "the rolling-window lower bound is INCLUSIVE: settled spend authorized at time t still counts at exactly t + window, and stops counting one tick later",
+      "mandate": {
+        "bounds": {
+          "max_amount": 500,
+          "total_budget": 100,
+          "budget_window_days": 1
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "status": "CLAIMED"
+          }
+        },
+        {
+          "settle": "t1",
+          "at": 1002,
+          "expect": {
+            "status": "SETTLED"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "x",
+            "amount": 50,
+            "at": 87400,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "BUDGET"
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t3",
+            "payee": "x",
+            "amount": 50,
+            "at": 87401,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "CLAIM",
+        "SETTLE",
+        "DECISION",
+        "DECISION"
+      ]
     }
   ]
 }
