@@ -4,7 +4,10 @@ Run:  python benchmarks/enforce_latency.py [--trials 5] [--n 2000]
 
 Measures per-decision latency and single-thread throughput for three
 backends: in-memory store, SQLite store, and an HTTP revocation registry
-served on loopback. Each trial uses a fresh mandate and evidence log and
+served on loopback. These are sequential microbenchmarks, not production
+performance: the HTTP backend crosses the loopback interface only; remote
+network latency, cross-process contention and production durability
+settings are not measured. Each trial uses a fresh mandate and evidence log and
 runs a 200-call warm-up before timing.
 """
 
