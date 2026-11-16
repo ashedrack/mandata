@@ -1,3 +1,12 @@
+## [0.4.19] — implements MMF-v0.3.19
+
+- Spec/documentation only; no behavior change (91 vectors, 227 tests).
+- Invalid-amount equivalence documented as a deliberate trade-off (stable
+  denial replay over distinguishing malformed attempts).
+- Rail idempotency key: default profile, `gate_id` stability/uniqueness
+  requirements, and documented adapter-side transformations for rails with
+  key length or alphabet limits.
+
 ## [0.4.18] — implements MMF-v0.3.18
 
 - **Documentation correction (no behavior change to amount handling)**:
