@@ -1,3 +1,15 @@
+## [0.4.22] — implements MMF-v0.3.22
+
+- No behavior change (91 vectors, 231 tests).
+- Spec §5.4: logical submission vs physical attempt; the normative baseline
+  dispatcher policy is *no new logical submission after an uncertain
+  outcome, reconcile read-only*. Same-key re-transmission is permitted only
+  as a documented policy outside MMF's guarantees. Replaces a sentence that
+  read as though resubmission were supported; the reference adapters have
+  always followed the baseline (the claim slot is consumed, the transaction
+  stays `CLAIMED`).
+- Benchmark docstring states that the HTTP backend is loopback only.
+
 ## [0.4.21] — implements MMF-v0.3.21
 
 - No behavior change (91 vectors, 231 tests).
