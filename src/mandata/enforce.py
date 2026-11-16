@@ -221,6 +221,9 @@ def claim(
     ledger = store or mandate._state
     with _serialized(chain, store):
         tx = ledger.get_tx(tx_id)
+        # a transaction of another mandate is UNKNOWN_TX: its stored fields
+        # must never be copied into this mandate's evidence (MMF §5.6)
+        own = tx if tx is not None and tx.mandate_id == mandate.mandate_id else None
         err = cause = None
         if tx is None or tx.mandate_id != mandate.mandate_id:
             err = f"unknown transaction {tx_id} for mandate {mandate.mandate_id}"
@@ -275,7 +278,7 @@ def claim(
                 tx_id=tx_id,
                 event="REJECTED",
                 currency=currency or "",
-                status=tx.status if tx is not None else "",
+                status=own.status if own is not None else "",
             )
         else:
             tx = dataclasses.replace(tx, status=CLAIMED)
@@ -359,6 +362,9 @@ def _transition(
     ledger = store or mandate._state
     with _serialized(chain, store):
         tx = ledger.get_tx(tx_id)
+        # a transaction of another mandate is UNKNOWN_TX: its stored fields
+        # must never be copied into this mandate's evidence (MMF §5.6)
+        own = tx if tx is not None and tx.mandate_id == mandate.mandate_id else None
         err = cause = None
         op = "SETTLE" if target == SETTLED else "VOID"
         if tx is None or tx.mandate_id != mandate.mandate_id:
@@ -389,16 +395,16 @@ def _transition(
             log.append(
                 mandate_id=mandate.mandate_id,
                 agent=mandate.agent,
-                payee=tx.payee if tx is not None else "",
-                amount=tx.amount if tx is not None else None,
+                payee=own.payee if own is not None else "",
+                amount=own.amount if own is not None else None,
                 allowed=False,
                 check=f"{op}:{cause}",
                 timestamp=at,
                 detail=err,
                 tx_id=tx_id,
                 event="REJECTED",
-                currency=tx.currency if tx is not None else "",
-                status=tx.status if tx is not None else "",
+                currency=own.currency if own is not None else "",
+                status=own.status if own is not None else "",
             )
         else:
             if target == VOIDED:

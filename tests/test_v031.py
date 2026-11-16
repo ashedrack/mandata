@@ -463,3 +463,22 @@ def test_structural_attenuation_implies_child_history_acceptable_to_parent():
             if parent._state.get_tx(f"c{i}").status == "AUTHORIZED" and child._state.get_tx(f"c{i}").status == "SETTLED":
                 claim(parent, f"c{i}", "x", amt, "GBP", evidence_log=EvidenceLog(), at=t)
                 settle(parent, f"c{i}", evidence_log=EvidenceLog(), at=t)
+
+
+def test_cross_mandate_rejection_does_not_copy_foreign_transaction_into_evidence(tmp_path):
+    store = SQLiteStore(tmp_path / "s.db")
+    a, b = mk(), mk()
+    log = EvidenceLog(store=store)
+    enforce(a, "secret.example", 123, currency="GBP", tx_id="t1", store=store, evidence_log=log, at=1000)
+    for fn in (
+        lambda: settle(b, "t1", store=store, evidence_log=log, at=1001),
+        lambda: claim(b, "t1", "x", 1, "GBP", store=store, evidence_log=log, at=1001),
+    ):
+        with pytest.raises(LifecycleError):
+            fn()
+    settle_rec, claim_rec = log.records[-2:]
+    assert settle_rec.check == "SETTLE:UNKNOWN_TX" and claim_rec.check == "CLAIM:UNKNOWN_TX"
+    assert settle_rec.payee == "" and settle_rec.amount is None and settle_rec.currency == ""
+    assert settle_rec.status == "" and claim_rec.status == ""
+    assert claim_rec.payee == "x" and claim_rec.amount == 1  # attempted instruction
+    assert a._state is not b._state

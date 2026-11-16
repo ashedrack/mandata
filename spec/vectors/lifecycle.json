@@ -1202,6 +1202,298 @@
         "DECISION",
         "VOID"
       ]
+    },
+    {
+      "id": "L21",
+      "desc": "claim of an expired mandate that is ALSO registry-revoked reports CLAIM:EXPIRED \u2014 claim reports local causes before the registry, intentionally unlike enforce (\u00a75.1)",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 500,
+          "expires_in_days": 1
+        }
+      },
+      "registry": {
+        "revoked": [
+          "m1"
+        ]
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP"
+          },
+          "at": 90000,
+          "expect": {
+            "error": true,
+            "check": "CLAIM:EXPIRED"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "REJECTED"
+      ]
+    },
+    {
+      "id": "L22",
+      "desc": "claim that is binding-mismatched AND registry-revoked reports CLAIM:BINDING, and the REJECTED record carries the ATTEMPTED payee/amount/currency, not the stored authorization's",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 500,
+          "expires_in_days": 30
+        }
+      },
+      "registry": {
+        "revoked": [
+          "m1"
+        ]
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "evil",
+            "amount": 61,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "error": true,
+            "check": "CLAIM:BINDING",
+            "record": {
+              "payee": "evil",
+              "amount": 61,
+              "currency": "GBP"
+            }
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "REJECTED"
+      ]
+    },
+    {
+      "id": "L23",
+      "desc": "claim with registry-reported revocation only reports CLAIM:REVOKED_REGISTRY",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 500,
+          "expires_in_days": 30
+        }
+      },
+      "registry": {
+        "revoked": [
+          "m1"
+        ]
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "error": true,
+            "check": "CLAIM:REVOKED_REGISTRY"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "REJECTED"
+      ]
+    },
+    {
+      "id": "L24",
+      "desc": "claim when the registry cannot be consulted fails closed as CLAIM:REGISTRY",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 500,
+          "expires_in_days": 30
+        }
+      },
+      "registry": {
+        "unavailable": true
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "error": true,
+            "check": "CLAIM:REGISTRY"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "REJECTED"
+      ]
+    },
+    {
+      "id": "L25",
+      "desc": "settle of an AUTHORIZED (never dispatched) transaction is rejected as SETTLE:STATUS",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 500,
+          "expires_in_days": 30
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "settle": "t1",
+          "at": 1001,
+          "expect": {
+            "error": true,
+            "check": "SETTLE:STATUS"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "REJECTED"
+      ]
+    },
+    {
+      "id": "L26",
+      "desc": "void of a CLAIMED transaction without a cancellation reference is rejected as VOID:CANCELLATION and the transaction stays CLAIMED",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 500,
+          "expires_in_days": 30
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "status": "CLAIMED"
+          }
+        },
+        {
+          "void": "t1",
+          "at": 1002,
+          "expect": {
+            "error": true,
+            "check": "VOID:CANCELLATION"
+          }
+        },
+        {
+          "settle": "t1",
+          "at": 1003,
+          "expect": {
+            "status": "SETTLED"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "CLAIM",
+        "REJECTED",
+        "SETTLE"
+      ]
     }
   ]
 }
