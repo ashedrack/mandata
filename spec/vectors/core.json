@@ -832,6 +832,30 @@
         "allowed": true,
         "check": "WITHIN"
       }
+    },
+    {
+      "id": "V36",
+      "desc": "unpaired surrogate in a canonical string field \u2014 malformed input rejected before evaluation; no decision, no evidence record. (The JSON escape below decodes to a lone surrogate in parsers that accept it; a parser that refuses to decode the input has also conformed.)",
+      "mandate": {
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30
+        }
+      },
+      "tx": {
+        "payee": "\ud800",
+        "amount": 10,
+        "at": 1000,
+        "currency": "GBP",
+        "tx_id": "tx-v36"
+      },
+      "expect": {
+        "rejected": true
+      }
     }
   ]
 }

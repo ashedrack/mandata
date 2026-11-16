@@ -1,3 +1,33 @@
+## [0.4.24] — implements MMF-v0.3.24
+
+- 92 vectors (36 core), 235 tests.
+- **Fix**: request strings bound for canonical evidence fields must be
+  Unicode scalar sequences. An unpaired surrogate (e.g. JSON `"\uD800"`)
+  or a non-string in `payee`/`currency`/`tx_id`, or a surrogate
+  cancellation `reference`, is rejected before evaluation — no decision, no
+  record. Previously such a value could be stored and then fail every
+  subsequent chain hash (`UnicodeEncodeError` on `head_hash`/verify),
+  effectively poisoning the log. New conformance vector V36; `lp_field`
+  now fails with a clear error as a backstop.
+- Spec: the registry timeout is a required finite *deployment* parameter;
+  cross-implementation decision equivalence assumes identical registry
+  observations and an identical timeout policy.
+
+## [0.4.23] — implements MMF-v0.3.23
+
+- No behavior change (91 vectors, 232 tests).
+- **Withdrawn as overstated**: "the linearization point is the claim's
+  commit". The claim's local commit is atomic, but the revocation/expiry
+  check is linearized at the *observation* (flags read, registry response
+  received). A revocation arriving between observation and commit does not
+  prevent the claim — the gate serializes its own ledger, not the registry
+  or the embedded `revoked` flag. Pinned by a test; global ordering needs
+  versioned registry validation or a shared consistency mechanism
+  (deployment-level, outside the spec).
+- Spec: no reliance on idempotency-key reuse after the rail's retention
+  period; raw-request log for malformed amounts needs its own access
+  controls and retention.
+
 ## [0.4.22] — implements MMF-v0.3.22
 
 - No behavior change (91 vectors, 231 tests).

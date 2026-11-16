@@ -1,6 +1,7 @@
 """MMF-v0.3.1 corrections — INVALID_CHAIN, CLAIMED dispatch, mandatory currency,
 chain-wide credentials, atomic durable evidence."""
 
+import json as _json
 import threading
 
 import pytest
@@ -26,6 +27,11 @@ from mandata.state import AUTHORIZED, CLAIMED, SETTLED, VOIDED
 def mk(**kw):
     bounds = Bounds(max_amount=kw.pop("max_amount", 100), **kw)
     return Mandate(principal="u", agent="a", bounds=bounds, issued_at=0)
+
+
+def _surrogate() -> str:
+    # A lone surrogate, as json.loads('"\\ud800"') yields it from the wire.
+    return _json.loads('"\\ud800"')
 
 
 def allowed(m, **kw):
@@ -637,3 +643,64 @@ def test_registry_wait_one_timeout_on_fault_but_scales_with_depth_when_answering
         assert d.allowed and time.perf_counter() - t0 >= 5 * 0.15 * 0.9
     finally:
         srv.shutdown()
+
+
+def test_claim_authority_is_observed_before_commit_so_a_revocation_in_the_gap_is_not_caught():
+    """Pins the documented limit (MMF §5.4): the revocation check is observed
+    inside the serialized transition, then the claim commits; a revocation that
+    becomes authoritative between the observation and the commit does not
+    prevent the claim. The gate serializes its own ledger, not the registry."""
+
+    class RevokesJustAfterAnswering:
+        revoked = False
+
+        def is_revoked(self, mandate_id):
+            answer = self.revoked
+            self.revoked = True  # the principal revokes immediately after this read
+            return answer
+
+    m, log, reg = mk(), EvidenceLog(), RevokesJustAfterAnswering()
+    enforce(m, "x", 10, currency="GBP", tx_id="gap1", evidence_log=log, at=1000)
+    tx = claim(m, "gap1", "x", 10, "GBP", evidence_log=log, at=1001, registry=reg)
+    assert tx.status == "CLAIMED" and reg.revoked  # claimed although revoked before the commit
+    enforce(m, "x", 10, currency="GBP", tx_id="gap2", evidence_log=log, at=1002)
+    with pytest.raises(LifecycleError):  # the very next claim observes the revocation
+        claim(m, "gap2", "x", 10, "GBP", evidence_log=log, at=1003, registry=reg)
+    assert log.records[-1].check == "CLAIM:REVOKED_REGISTRY"
+
+
+def test_non_scalar_request_strings_are_rejected_before_evaluation():
+    """MMF §5.6: a string bound for a canonical evidence field MUST be a
+    Unicode scalar sequence. An unpaired surrogate or a non-string is
+    malformed input — refused before evaluation, so it can never be stored
+    and then poison every subsequent chain hash."""
+    m, log = mk(currency="GBP"), EvidenceLog()
+    enforce(m, "x", 10, currency="GBP", tx_id="ok", evidence_log=log, at=1000)
+    bad = _surrogate()
+    for kwargs in (
+        {"payee": bad, "amount": 10, "currency": "GBP", "tx_id": "s1"},
+        {"payee": "x", "amount": 10, "currency": "GBP", "tx_id": bad},
+        {"payee": "x", "amount": 10, "currency": bad, "tx_id": "s3"},
+    ):
+        with pytest.raises(ValueError):
+            enforce(m, at=1000, evidence_log=log, **kwargs)
+    with pytest.raises(TypeError):  # a non-string payee is malformed too
+        enforce(m, 123, 10, currency="GBP", tx_id="s4", evidence_log=log, at=1000)
+    assert len(log.records) == 1  # the earlier good decision only
+    assert log.verify_chain()  # and the chain still hashes
+    d = enforce(m, "x", 10, currency="GBP", tx_id="ok", evidence_log=log, at=1000)
+    assert d.replayed  # the stored good transaction is unaffected
+
+
+def test_lifecycle_calls_reject_non_scalar_strings():
+    m, log = mk(currency="GBP"), EvidenceLog()
+    bad = _surrogate()
+    with pytest.raises(ValueError):
+        claim(m, bad, "x", 10, "GBP", evidence_log=log, at=1000)
+    with pytest.raises(ValueError):
+        void(m, bad, evidence_log=log, at=1000)
+    enforce(m, "x", 10, currency="GBP", tx_id="ok", evidence_log=log, at=1000)
+    claim(m, "ok", "x", 10, "GBP", evidence_log=log, at=1001)
+    with pytest.raises(ValueError):  # a surrogate cancellation reference
+        void(m, "ok", evidence_log=log, at=1002, cancellation=bad)
+    assert len(log.records) == 2  # DECISION + CLAIM only; refusals record nothing

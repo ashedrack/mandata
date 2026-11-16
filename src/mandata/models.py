@@ -44,8 +44,19 @@ def lp_field(value: str) -> str:
     The value's exact Unicode scalar sequence is preserved — no NFC or other
     normalization — so an evidence record is a faithful byte representation
     of the request the gate evaluated, matching §5.3's exact request equality.
+
+    A value that is not a Unicode scalar sequence — a non-string, or a
+    string containing unpaired surrogates such as a JSON ``\\uD800`` escape
+    can produce — has no well-formed UTF-8 encoding and cannot be
+    canonicalized. It is rejected rather than recorded (MMF §5.6).
     """
-    return f"{len(value.encode('utf-8'))}:{value}"
+    if not isinstance(value, str):
+        raise TypeError(f"canonical field must be a string, got {value!r}")
+    try:
+        n = len(value.encode("utf-8"))
+    except UnicodeEncodeError as e:
+        raise ValueError(f"canonical field is not a Unicode scalar sequence: {value!r}") from e
+    return f"{n}:{value}"
 
 
 def lp_fields(*values: str) -> str:

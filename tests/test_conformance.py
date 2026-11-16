@@ -97,6 +97,12 @@ def test_core_vector(v):
         m.record(p["at"], p["amount"], tx_id=f"prior-{p['at']}")
         m._state.resolve(m.mandate_id, f"prior-{p['at']}")
 
+    if v["expect"].get("rejected"):  # malformed input refused before evaluation (§5.6)
+        with pytest.raises(ValueError):
+            run(m, v["tx"], log, registry)
+        assert len(log.records) == 0  # no decision, no evidence record
+        return
+
     d = run(m, v["tx"], log, registry)
     assert (d.allowed, d.check) == (v["expect"]["allowed"], v["expect"]["check"]), d.reason
     assert d.evidence.check == d.check
