@@ -1,3 +1,17 @@
+## [0.4.16] — implements MMF-v0.3.16
+
+- **Fix (evidence leak)**: on a gate-wide shared store, a rejected
+  `settle`/`void`/`claim` for a transaction belonging to *another mandate*
+  copied that transaction's payee, amount, currency and status into the
+  rejecting mandate's `REJECTED` evidence record. Such a transaction is now
+  `UNKNOWN_TX` and its stored fields are never copied. Regression test added.
+- **Conformance**: rejection causes and precedence are now testable —
+  lifecycle vectors L21–L26 assert the `<OP>:<CAUSE>` check and attempted
+  instruction fields (the runner supports a per-vector registry). 82 vectors,
+  216 tests.
+- Spec: attenuation proof scoped to one hypothetical history; deployed
+  ancestor counters can only further restrict.
+
 ## [0.4.15] — implements MMF-v0.3.15
 
 - Spec: structural vs effective delegation attenuation defined over

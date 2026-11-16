@@ -135,6 +135,7 @@ def test_delegation_vector(v):
 @pytest.mark.parametrize("v", LIFECYCLE, ids=[v["id"] for v in LIFECYCLE])
 def test_lifecycle_vector(v):
     m = build_mandate(v["mandate"])
+    registry = build_registry(v.get("registry"))
     log = EvidenceLog()
     for step in v["steps"]:
         expect = step["expect"]
@@ -160,6 +161,7 @@ def test_lifecycle_vector(v):
                     c["currency"],
                     evidence_log=log,
                     at=step["at"],
+                    registry=registry,
                 )
             elif "settle" in step:
                 tx = settle(m, step["settle"], evidence_log=log, at=step["at"])
@@ -175,7 +177,12 @@ def test_lifecycle_vector(v):
             assert expect.get("error"), f"{v['id']}: unexpected rejection"
             # rejected transitions append exactly one REJECTED evidence record
             assert len(log.records) == before + 1
-            assert log.records[-1].event == "REJECTED"
+            rec = log.records[-1]
+            assert rec.event == "REJECTED"
+            if "check" in expect:  # normative <OP>:<CAUSE> and precedence (MMF §5.6)
+                assert rec.check == expect["check"]
+            for k, val in expect.get("record", {}).items():  # attempted-instruction fields
+                assert getattr(rec, k) == val, f"{v['id']}: record.{k}"
         else:
             assert not expect.get("error"), f"{v['id']}: expected rejection"
             assert tx.status == expect["status"]
