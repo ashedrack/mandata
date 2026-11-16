@@ -721,6 +721,107 @@
           }
         }
       ]
+    },
+    {
+      "id": "D18",
+      "desc": "parent window 1 day, child window 2 days (valid): a settled transaction that has aged out of the parent window still counts for the child and denies; an unresolved authorization keeps counting at any age at every chain member",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [],
+        "expires_in_days": 30,
+        "velocity_limit": 0,
+        "total_budget": 100,
+        "budget_window_days": 1
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 100,
+            "currency": "GBP",
+            "allowed_payees": [],
+            "expires_in_days": 30,
+            "velocity_limit": 0,
+            "total_budget": 100,
+            "budget_window_days": 2
+          },
+          "expect": "valid"
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP",
+            "at": 2000,
+            "tx_id": "t1"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "as": "c",
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 60,
+            "currency": "GBP"
+          },
+          "at": 2001
+        },
+        {
+          "settle": {
+            "as": "c",
+            "tx_id": "t1"
+          },
+          "at": 2002
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "x",
+            "amount": 50,
+            "currency": "GBP",
+            "at": 90000,
+            "tx_id": "t2"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "BUDGET"
+          }
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "x",
+            "amount": 40,
+            "currency": "GBP",
+            "at": 90000,
+            "tx_id": "t3"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN"
+          }
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "x",
+            "amount": 70,
+            "currency": "GBP",
+            "at": 290000,
+            "tx_id": "t4"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "BUDGET"
+          }
+        }
+      ]
     }
   ]
 }

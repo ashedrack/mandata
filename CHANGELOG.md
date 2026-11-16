@@ -1,3 +1,18 @@
+## [0.4.17] — implements MMF-v0.3.17
+
+- No behavior change: the reference already satisfied every rule below;
+  they are now specified and conformance-tested.
+- New vectors **L27** (cross-mandate `TX_CONFLICT` evidence carries the
+  attempting mandate, never the stored one), **L28** (rolling-window lower
+  bound is inclusive — a `>=` → `>` mutation fails it) and **D18**
+  (shorter-window parent, longer-window child, aged settled spend plus an
+  unresolved authorization) — 85 vectors, 219 tests.
+- Spec: rail idempotency key rule (`tx_id` verbatim or injective documented
+  derivation); normative window arithmetic; evidence described as a
+  canonical hash-bound representation, not a verbatim copy.
+- Conformance runner: second mandate on a shared ledger, record-field
+  assertions, claim/settle steps in delegation vectors.
+
 ## [0.4.16] — implements MMF-v0.3.16
 
 - **Fix (evidence leak)**: on a gate-wide shared store, a rejected

@@ -124,6 +124,13 @@ def test_delegation_vector(v):
                 child = delegate(source, step["delegate"], bounds, at=1000)
                 assert child.parent_mandate_id == source.mandate_id
                 mandates[step["delegate"]] = child
+        elif "claim" in step:
+            c = step["claim"]
+            claim(mandates[c["as"]], c["tx_id"], c["payee"], c["amount"], c["currency"],
+                  evidence_log=log, at=step["at"])
+        elif "settle" in step:
+            c = step["settle"]
+            settle(mandates[c["as"]], c["tx_id"], evidence_log=log, at=step["at"])
         else:
             tx = step["tx"]
             d = run(mandates[tx["as"]], tx, log)
@@ -135,19 +142,26 @@ def test_delegation_vector(v):
 @pytest.mark.parametrize("v", LIFECYCLE, ids=[v["id"] for v in LIFECYCLE])
 def test_lifecycle_vector(v):
     m = build_mandate(v["mandate"])
+    mandates = {"m": m}
+    if "mandate2" in v:  # a second mandate sharing the gate-wide ledger (MMF §5.3)
+        mandates["m2"] = build_mandate(v["mandate2"])
+        mandates["m2"]._state = m._state
     registry = build_registry(v.get("registry"))
     log = EvidenceLog()
     for step in v["steps"]:
         expect = step["expect"]
         if "tx" in step:
-            d = run(m, step["tx"], log)
+            d = run(mandates[step["tx"].get("as", "m")], step["tx"], log)
             got = {
                 "allowed": d.allowed,
                 "check": d.check,
                 "replayed": d.replayed,
                 "status": d.status,
             }
-            assert {k: got[k] for k in expect} == expect, d.reason
+            checks = {k: val for k, val in expect.items() if k != "record"}
+            assert {k: got[k] for k in checks} == checks, d.reason
+            for k, val in expect.get("record", {}).items():
+                assert getattr(log.records[-1], k) == val, f"{v['id']}: record.{k}"
             continue
         before = len(log.records)
         try:
