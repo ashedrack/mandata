@@ -14,6 +14,7 @@ from mandata import (
     LifecycleError,
     Mandate,
     SQLiteStore,
+    claim,
     delegate,
     enforce,
     from_minor,
@@ -85,6 +86,7 @@ def test_settled_or_voided_decision_no_longer_binds():
     m, log = mk(), EvidenceLog()
     d = enforce(m, "tesco.com", 500, tx_id="t1", evidence_log=log, currency="GBP")
     assert d.binds("tesco.com", 500)
+    claim(m, "t1", "tesco.com", 500, "GBP", evidence_log=log)
     settle(m, "t1", evidence_log=log)
     retry = enforce(m, "tesco.com", 500, tx_id="t1", evidence_log=log, currency="GBP")
     assert retry.replayed and retry.status == "SETTLED"
@@ -253,6 +255,7 @@ def test_signed_evidence_verifies_and_detects_forgery():
     log = EvidenceLog(signing_key=key)
     m = mk()
     enforce(m, "x", 10, tx_id="t1", evidence_log=log, currency="GBP")
+    claim(m, "t1", "x", 10, "GBP", evidence_log=log)
     settle(m, "t1", evidence_log=log)
     assert log.verify_chain(public_key=log.public_key)
 

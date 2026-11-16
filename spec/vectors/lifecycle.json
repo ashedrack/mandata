@@ -1,6 +1,4 @@
 {
-  "version": "mmf-v0.3",
-  "description": "Transaction lifecycle vectors (MMF-v0.3 \u00a75.3-5.4). Each vector runs its steps in order against one mandate. A tx step calls the gate; settle/void steps transition a tx_id. expect.error=true means the transition MUST be rejected and MUST NOT append evidence. events lists the evidence event of every record, in order. Amounts are minor units.",
   "vectors": [
     {
       "id": "L01",
@@ -277,7 +275,7 @@
     },
     {
       "id": "L06",
-      "desc": "settled transactions keep their budget and cannot be voided; settle is idempotent",
+      "desc": "settled transactions keep their budget and cannot be voided; settle requires CLAIMED and is idempotent",
       "mandate": {
         "bounds": {
           "max_amount": 100,
@@ -296,6 +294,18 @@
           "expect": {
             "allowed": true,
             "check": "WITHIN"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "x",
+            "amount": 80,
+            "currency": "GBP"
+          },
+          "at": 1000.5,
+          "expect": {
+            "status": "CLAIMED"
           }
         },
         {
@@ -335,6 +345,7 @@
       ],
       "events": [
         "DECISION",
+        "CLAIM",
         "SETTLE",
         "REJECTED",
         "DECISION"

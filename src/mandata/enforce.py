@@ -245,7 +245,7 @@ def claim(
                     try:
                         if registry.is_revoked(node.mandate_id):
                             err = f"{_label(node, mandate)} revoked (registry) — cannot dispatch"
-                            cause = "REVOKED"
+                            cause = "REVOKED_REGISTRY"
                             break
                     except Exception as exc:  # noqa: BLE001 — fail closed on registry faults
                         err = f"revocation registry unavailable ({exc.__class__.__name__})"
@@ -360,8 +360,14 @@ def _transition(
             cause = "UNKNOWN_TX"
         elif tx.status == target:
             return tx  # idempotent repeat: unchanged, no evidence
-        elif tx.status not in (AUTHORIZED, CLAIMED):
-            err = f"cannot move {tx_id} from {tx.status} to {target}"
+        elif target == SETTLED and tx.status != CLAIMED:
+            # Settle records that the rail executed — only reachable via the
+            # claim slot. An AUTHORIZED transaction was never dispatched, so
+            # it cannot settle; it can only be claimed or voided.
+            err = f"cannot settle {tx_id}: status is {tx.status}, not CLAIMED"
+            cause = "STATUS"
+        elif target == VOIDED and tx.status not in (AUTHORIZED, CLAIMED):
+            err = f"cannot void {tx_id}: status is {tx.status}"
             cause = "STATUS"
         elif target == VOIDED and tx.status == CLAIMED and not cancellation:
             err = (
