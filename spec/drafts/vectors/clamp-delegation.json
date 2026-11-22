@@ -1,0 +1,269 @@
+{
+  "version": "mmf-v0.5-draft",
+  "status": "DRAFT, not normative, not wired into the test suite. See spec/drafts/mmf-v0.5-clamp-proposal.md",
+  "description": "Clamp to cap vectors, delegation format (same step grammar as spec/vectors/delegation.json). The parent is issued at t=0, children are delegated at t=1000. Same extra expect keys and Shape 2 convention as clamp-core.json.",
+  "vectors": [
+    {
+      "id": "KD01",
+      "desc": "child with clamp on: over cap spend is authorized at the child's cap",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 0,
+        "total_budget": 200,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 100,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 0,
+            "total_budget": 200,
+            "budget_window_days": 30,
+            "clamp": true
+          },
+          "expect": "valid"
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 150,
+            "currency": "GBP",
+            "at": 2000
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "clamped": true,
+            "requested_amount": 150,
+            "effective_amount": 100,
+            "effective_cap": 100
+          }
+        }
+      ]
+    },
+    {
+      "id": "KD02",
+      "desc": "leaf governs: parent clamp true does not clamp a child whose clamp is false",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 0,
+        "total_budget": 200,
+        "budget_window_days": 30,
+        "clamp": true
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 100,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 0,
+            "total_budget": 200,
+            "budget_window_days": 30
+          },
+          "expect": "valid"
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 150,
+            "currency": "GBP",
+            "at": 2000
+          },
+          "expect": {
+            "allowed": false,
+            "check": "CAP_EXCEEDED",
+            "clamped": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "KD03",
+      "desc": "leaf governs: child clamp true clamps even when the parent's clamp is false",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 0,
+        "total_budget": 200,
+        "budget_window_days": 30,
+        "clamp": false
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 100,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 0,
+            "total_budget": 200,
+            "budget_window_days": 30,
+            "clamp": true
+          },
+          "expect": "valid"
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 150,
+            "currency": "GBP",
+            "at": 2000
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "clamped": true,
+            "requested_amount": 150,
+            "effective_amount": 100,
+            "effective_cap": 100
+          }
+        }
+      ]
+    },
+    {
+      "id": "KD04",
+      "desc": "registration stays strict: a wider child cap is still invalid even with clamp true",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 0,
+        "total_budget": 200,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 501,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 0,
+            "total_budget": 200,
+            "budget_window_days": 30,
+            "clamp": true
+          },
+          "expect": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "KD05",
+      "desc": "clamped spends are charged to every ancestor: the parent's budget stops the child",
+      "parent": {
+        "max_amount": 500,
+        "currency": "GBP",
+        "allowed_payees": [
+          "tesco.com"
+        ],
+        "expires_in_days": 30,
+        "velocity_limit": 0,
+        "total_budget": 200,
+        "budget_window_days": 30
+      },
+      "steps": [
+        {
+          "delegate": "c",
+          "bounds": {
+            "max_amount": 100,
+            "currency": "GBP",
+            "allowed_payees": [
+              "tesco.com"
+            ],
+            "expires_in_days": 30,
+            "velocity_limit": 0,
+            "total_budget": 200,
+            "budget_window_days": 30,
+            "clamp": true
+          },
+          "expect": "valid"
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 150,
+            "currency": "GBP",
+            "at": 2000
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "clamped": true,
+            "requested_amount": 150,
+            "effective_amount": 100,
+            "effective_cap": 100
+          }
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 150,
+            "currency": "GBP",
+            "at": 2001
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "clamped": true,
+            "requested_amount": 150,
+            "effective_amount": 100,
+            "effective_cap": 100
+          }
+        },
+        {
+          "tx": {
+            "as": "c",
+            "payee": "tesco.com",
+            "amount": 50,
+            "currency": "GBP",
+            "at": 2002
+          },
+          "expect": {
+            "allowed": false,
+            "check": "BUDGET",
+            "clamped": false
+          }
+        }
+      ]
+    }
+  ]
+}

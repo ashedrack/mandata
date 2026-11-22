@@ -1,0 +1,787 @@
+{
+  "version": "mmf-v0.5-draft",
+  "status": "DRAFT, not normative, not wired into the test suite. See spec/drafts/mmf-v0.5-clamp-proposal.md",
+  "description": "Clamp to cap vectors, lifecycle format (same step grammar as spec/vectors/lifecycle.json). bounds.clamp is the proposed field. Extra expect keys: clamped, requested_amount, effective_amount, effective_cap. Check values on clamped decisions follow Shape 2 (check names CAP_EXCEEDED, allowed true). For Shape 1, replace CAP_EXCEEDED with WITHIN wherever clamped is true. Amounts are integers in minor units.",
+  "vectors": [
+    {
+      "id": "K01",
+      "desc": "clamp on: over cap request is authorized at the cap, check names the bound, record carries the effective amount",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "status": "AUTHORIZED",
+            "clamped": true,
+            "requested_amount": 60000,
+            "effective_amount": 50000,
+            "effective_cap": 50000,
+            "record": {
+              "amount": 50000,
+              "allowed": true,
+              "check": "CAP_EXCEEDED"
+            }
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K02",
+      "desc": "clamp absent: over cap request denies as CAP_EXCEEDED exactly as in v0.3.24",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "CAP_EXCEEDED",
+            "status": "DENIED",
+            "clamped": false,
+            "record": {
+              "amount": 60000,
+              "allowed": false
+            }
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K03",
+      "desc": "clamp explicitly false behaves as absent",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": false
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "CAP_EXCEEDED",
+            "status": "DENIED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K04",
+      "desc": "clamp on, amount exactly at the cap: not clamped, WITHIN",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 50000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN",
+            "status": "AUTHORIZED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K05",
+      "desc": "clamp on, amount below the cap: not clamped, WITHIN",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 4999,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN",
+            "status": "AUTHORIZED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K06",
+      "desc": "clamp on, over cap AND wrong payee: PAYEE denies, the clamp does not mask a later failure",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "evil.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "PAYEE",
+            "status": "DENIED",
+            "clamped": false,
+            "record": {
+              "amount": 60000,
+              "allowed": false
+            }
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K07",
+      "desc": "clamp on, over cap AND wrong currency: CURRENCY denies",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "USD"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "CURRENCY",
+            "status": "DENIED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K08",
+      "desc": "clamp on, non positive amount: NON_POSITIVE denies before any clamp is considered",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 0,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "NON_POSITIVE",
+            "status": "DENIED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K09",
+      "desc": "clamp on, expired mandate and over cap: EXPIRED denies (expiry is checked before the cap)",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 1,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 200000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "EXPIRED",
+            "status": "DENIED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K10",
+      "desc": "clamp on, locally revoked and over cap: REVOKED denies",
+      "mandate": {
+        "mandate_id": "m1",
+        "revoked": true,
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "REVOKED",
+            "status": "DENIED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K11",
+      "desc": "a clamped authorization is one issued authorization for VELOCITY",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 1,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "status": "AUTHORIZED",
+            "clamped": true,
+            "requested_amount": 60000,
+            "effective_amount": 50000,
+            "effective_cap": 50000
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "tesco.com",
+            "amount": 10,
+            "at": 1001,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "VELOCITY",
+            "status": "DENIED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K12",
+      "desc": "budget reserves the effective amount, not the requested amount",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 60,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true,
+          "total_budget": 100
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 90,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "status": "AUTHORIZED",
+            "clamped": true,
+            "requested_amount": 90,
+            "effective_amount": 60,
+            "effective_cap": 60
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "tesco.com",
+            "amount": 40,
+            "at": 1001,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN",
+            "status": "AUTHORIZED",
+            "clamped": false
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t3",
+            "payee": "tesco.com",
+            "amount": 1,
+            "at": 1002,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "BUDGET",
+            "status": "DENIED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "DECISION",
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K13",
+      "desc": "budget is evaluated with the clamped amount: a request that cannot fit even after clamping denies as BUDGET and is not recorded as clamped",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 60,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true,
+          "total_budget": 100
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "WITHIN",
+            "status": "AUTHORIZED",
+            "clamped": false
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t2",
+            "payee": "tesco.com",
+            "amount": 90,
+            "at": 1001,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "BUDGET",
+            "status": "DENIED",
+            "clamped": false,
+            "record": {
+              "amount": 90,
+              "allowed": false
+            }
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K14",
+      "desc": "replay of a clamped decision returns the stored clamp fields and the stored cap",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "status": "AUTHORIZED",
+            "clamped": true,
+            "requested_amount": 60000,
+            "effective_amount": 50000,
+            "effective_cap": 50000
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "replayed": true,
+            "status": "AUTHORIZED",
+            "clamped": true,
+            "requested_amount": 60000,
+            "effective_amount": 50000,
+            "effective_cap": 50000
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "REPLAY"
+      ]
+    },
+    {
+      "id": "K15",
+      "desc": "request equality uses the requested amount: a different requested amount that clamps to the same effective amount is TX_CONFLICT, and so is the effective amount itself",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "status": "AUTHORIZED",
+            "clamped": true,
+            "requested_amount": 60000,
+            "effective_amount": 50000,
+            "effective_cap": 50000
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 70000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "TX_CONFLICT",
+            "status": "DENIED",
+            "clamped": false
+          }
+        },
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 50000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": false,
+            "check": "TX_CONFLICT",
+            "status": "DENIED",
+            "clamped": false
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "DECISION",
+        "DECISION"
+      ]
+    },
+    {
+      "id": "K16",
+      "desc": "claim binds the effective amount: claiming the requested amount fails as CLAIM:BINDING, claiming the effective amount succeeds",
+      "mandate": {
+        "mandate_id": "m1",
+        "bounds": {
+          "max_amount": 50000,
+          "currency": "GBP",
+          "allowed_payees": [
+            "tesco.com"
+          ],
+          "expires_in_days": 30,
+          "velocity_limit": 0,
+          "clamp": true
+        }
+      },
+      "steps": [
+        {
+          "tx": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "at": 1000,
+            "currency": "GBP"
+          },
+          "expect": {
+            "allowed": true,
+            "check": "CAP_EXCEEDED",
+            "status": "AUTHORIZED",
+            "clamped": true,
+            "requested_amount": 60000,
+            "effective_amount": 50000,
+            "effective_cap": 50000
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 60000,
+            "currency": "GBP"
+          },
+          "at": 1001,
+          "expect": {
+            "error": true,
+            "check": "CLAIM:BINDING"
+          }
+        },
+        {
+          "claim": {
+            "tx_id": "t1",
+            "payee": "tesco.com",
+            "amount": 50000,
+            "currency": "GBP"
+          },
+          "at": 1002,
+          "expect": {
+            "status": "CLAIMED"
+          }
+        },
+        {
+          "settle": "t1",
+          "at": 1003,
+          "expect": {
+            "status": "SETTLED"
+          }
+        }
+      ],
+      "events": [
+        "DECISION",
+        "REJECTED",
+        "CLAIM",
+        "SETTLE"
+      ]
+    }
+  ]
+}
