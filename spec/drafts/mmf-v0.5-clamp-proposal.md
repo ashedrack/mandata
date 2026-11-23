@@ -115,6 +115,12 @@ the other three are omitted from the serialized decision.
 | `effective_amount` | The amount authorized and reserved. Only when `clamped` |
 | `effective_cap` | The resolved cap at decision time. Only when `clamped` |
 
+On a clamped decision `requested_amount`, `effective_amount` and
+`effective_cap` are REQUIRED fields, not optional annotations.
+`effective_cap` in particular is what makes a clamped record replayable
+(section 7), and it is the recorded value any future owner tightening
+proposal must anchor on (section 3).
+
 The existing `amount` field on a decision (§4, "the exact amount it
 evaluated") is defined as the **effective amount**. Payee binding (§5.5)
 therefore binds the effective amount.
@@ -125,17 +131,20 @@ non conformant, because the caller would believe its full request is reserved.
 
 ### 5.1 The `check` value of a clamped decision
 
-**OPEN, two shapes.** The thread converged on keeping clamp out of the check id
-namespace as a new pseudo denial. Two ways to do that remain.
+**RESOLVED, Shape 2.** The thread converged on keeping clamp out of the check
+id namespace as a new pseudo denial, and the second implementation confirmed
+Shape 2 over Shape 1.
 
-**Shape 2 (this draft's position).** A clamped decision has `allowed = true`,
+**Shape 2 (agreed).** A clamped decision has `allowed = true`,
 `check = CAP_EXCEEDED`, `clamped = true`. The check names the bound that would
 have fired, so the evidence answers "which cap bound this" without a new id.
 
 This requires one wording change in §5.1: "`WITHIN` is the success outcome
 reached when all ten pass" becomes "`WITHIN` is the success outcome reached
 when all ten pass unadjusted. A decision with `allowed = true` and
-`clamped = true` carries the check id of the bound that adjusted the amount."
+`clamped = true` carries the check id of the bound that adjusted the amount.
+A check id on an allowed decision names the adjusting bound; it is not a
+denial and MUST NOT be read as a failed check."
 
 **Shape 1 (alternative).** A clamped decision has `allowed = true`,
 `check = WITHIN`, `clamped = true`. Clamp is purely a decision modifier and
@@ -181,6 +190,10 @@ hand.
   `effective_cap`, even if the resolved cap would differ if evaluated now.
   Verifiers replaying at different times therefore agree, because the cap is a
   recorded value and not a function of when evaluation happens (K14).
+- **Deferred case.** "Same requested amount, new `tx_id`, after a cap change"
+  has no vector in this draft. It is inexpressible until an owner tightening
+  operation exists (section 3), so the gap is deliberate rather than missed.
+  It lands with the tighten proposal.
 
 ## 8. State and lifecycle (amends §5.2, §5.4, §5.5)
 
@@ -193,9 +206,12 @@ hand.
 
 ## 9. Delegation (amends §6)
 
-**OPEN, register time.** This draft keeps registration **strict**: a delegate
-whose `max_amount` is wider than its parent's MUST be rejected, exactly as
-today, regardless of any `clamp` value (KD04). Reasons:
+**RESOLVED, register time (strict).** This draft keeps registration
+**strict**: a delegate whose `max_amount` is wider than its parent's MUST be
+rejected, exactly as today, regardless of any `clamp` value (KD04). The second
+implementation confirmed this position and is switching its register path to
+reject a widening delegate cap, so D03 to D12 pass unchanged on both sides.
+Reasons:
 
 1. Registration is a configuration action, not a spend. Silently narrowing a
    declared delegation, with no event, is the kind of silent change the
@@ -222,19 +238,22 @@ new event, which the thread preferred to avoid.
 
 ## 11. Open choices for the thread
 
-1. **Check value of a clamped decision:** Shape 2 (`CAP_EXCEEDED`, this draft)
-   or Shape 1 (`WITHIN`). Section 5.1.
-2. **Register time:** strict (this draft) or a recorded clamp event. Section 9.
+Resolved by the thread and the second implementation:
+
+1. **Check value of a clamped decision:** Shape 2 (`CAP_EXCEEDED`).
+   Section 5.1.
+2. **Register time:** strict, no recorded event. Section 9.
+5. **Owner tightening:** a separate proposal. Section 3. `effective_cap`
+   stays REQUIRED on clamped decisions so that proposal has its anchor.
+7. **Naming:** `CAP_EXCEEDED` confirmed for the per transaction cap.
+
+Still open:
+
 3. **Where `clamp` lives:** inside `bounds` and signed (this draft) or on the
    mandate outside `bounds`. Inside `bounds` changes what the principal signs
    but keeps clamping out of agent hands.
 4. **Whose `clamp` governs:** the leaf only (this draft) or any chain member.
-5. **Owner tightening:** in scope for this proposal, or a separate one.
-   Section 3.
 6. **Canonical payload change:** the inclusion rule in section 6.
-7. **Naming.** The thread used `DELEGATE_CAP` as an example check id. The
-   existing id for the per transaction cap is `CAP_EXCEEDED`, which this draft
-   reuses. Confirm that is intended.
 
 ## 12. Implementation notes (non normative)
 
