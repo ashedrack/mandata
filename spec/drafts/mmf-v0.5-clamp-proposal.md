@@ -247,13 +247,18 @@ Resolved by the thread and the second implementation:
    stays REQUIRED on clamped decisions so that proposal has its anchor.
 7. **Naming:** `CAP_EXCEEDED` confirmed for the per transaction cap.
 
-Still open:
+Resolved by the second implementation's review of the pinned branch:
 
-3. **Where `clamp` lives:** inside `bounds` and signed (this draft) or on the
-   mandate outside `bounds`. Inside `bounds` changes what the principal signs
-   but keeps clamping out of agent hands.
-4. **Whose `clamp` governs:** the leaf only (this draft) or any chain member.
-6. **Canonical payload change:** the inclusion rule in section 6.
+3. **Where `clamp` lives:** inside `bounds` and signed. The owner signs the
+   envelope or delegate record, so an agent cannot enable clamping on itself.
+4. **Whose `clamp` governs:** the leaf only, matching the second
+   implementation's delegate record shape in both directions.
+6. **Canonical payload change:** the three-field extension in section 6.
+   Fields present only when `clamped` keeps every existing record hash byte
+   identical, the property that matters most for a draft amendment.
+
+All seven choices are now resolved. The shape is frozen pending the second
+implementation's 21-vector harness run reported on #33.
 
 ## 12. Implementation notes (non normative)
 
