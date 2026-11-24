@@ -17,11 +17,15 @@ Ported: the `enforce()` decision gate (all checks, idempotent `txId`
 replay/TX_CONFLICT, delegation chains, credentials, revocation registry),
 the settlement lifecycle (`claim`/`settle`/`void` with REJECTED evidence),
 canonical serialization (`lp_fields`, `canonical_number`), the hash-chained
-evidence log with optional Ed25519 signing, and `InMemoryStore` /
-`InMemoryRegistry`.
+evidence log with optional Ed25519 signing, `InMemoryStore` and
+`SQLiteStore` (stdlib `node:sqlite`, WAL + `BEGIN IMMEDIATE` sections —
+persists spend rows, the tx ledger and evidence rows atomically),
+`InMemoryRegistry`, `HTTPRegistry` (prefetching — the gate's `isRevoked` is
+synchronous, so `refresh(mandateIds)` pulls statuses before evaluation and
+an unrefreshed id fails closed), external anchoring (`anchor` /
+`verifyAnchor`), and `railIdempotencyKey`.
 
-Not yet ported: `SQLiteStore`, `HTTPRegistry`, external anchoring
-(`anchoring.py`), `railkey`, revocation reporting. Contributions welcome —
+Not yet ported: revocation reporting. Contributions welcome —
 write against `spec/` and the vectors, not by copying internals.
 
 ## Layout
@@ -30,11 +34,14 @@ write against `spec/` and the vectors, not by copying internals.
     src/models.ts       Bounds, Mandate, Decision, EvidenceRecord
     src/enforce.ts      enforce(), claim(), settle(), void() — the gate
     src/state.ts        TxRecord, InMemoryStore, lifecycle statuses
+    src/sqlite.ts       SQLiteStore — durable counters, ledger, evidence (node:sqlite)
     src/evidence.ts     EvidenceLog — hash-chained records, Ed25519 signing
+    src/anchoring.ts    anchor / verifyAnchor — external timestamp proofs
     src/credentials.ts  bounds_hash, issue/verify credentials
     src/delegation.ts   delegate() — tightening-only sub-mandates
     src/money.ts        minor-unit amounts, ISO 4217 exponents
-    src/revocation.ts   RevocationRegistry, InMemoryRegistry
+    src/revocation.ts   RevocationRegistry, InMemoryRegistry, HTTPRegistry
+    src/railkey.ts      gate-scoped rail idempotency keys (MMF §5.4)
     test/vectors.test.ts  conformance runner for spec/vectors/*.json
 
 ## Develop

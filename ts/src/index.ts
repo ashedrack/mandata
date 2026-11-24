@@ -3,6 +3,8 @@
  * Python reference gate (mandata 0.4.x, MMF-v0.3).
  */
 
+export { anchor, verifyAnchor } from "./anchoring";
+export type { Anchor } from "./anchoring";
 export { assertScalars, canonicalNumber, lpField, lpFields } from "./canonical";
 export { Credential, boundsHash, credentialPayload, issueCredential, verifyCredential } from "./credentials";
 export type { CredentialInit } from "./credentials";
@@ -32,7 +34,9 @@ export {
   registerCurrency,
   toMinor,
 } from "./money";
-export { InMemoryRegistry } from "./revocation";
+export { railIdempotencyKey } from "./railkey";
+export { HTTPRegistry, InMemoryRegistry } from "./revocation";
 export type { RevocationRegistry } from "./revocation";
+export { SQLiteStore } from "./sqlite";
 export { AUTHORIZED, CLAIMED, DENIED, SETTLED, VOIDED, InMemoryStore, TxRecord } from "./state";
 export type { StateStore } from "./state";
