@@ -15,7 +15,17 @@ Run:  python examples/mock_rail.py
 
 from __future__ import annotations
 
-from mandata import Bounds, EvidenceLog, LifecycleError, Mandate, claim, enforce, settle, to_minor, void
+from mandata import (
+    Bounds,
+    EvidenceLog,
+    LifecycleError,
+    Mandate,
+    claim,
+    enforce,
+    settle,
+    to_minor,
+    void,
+)
 
 
 class MockRail:
