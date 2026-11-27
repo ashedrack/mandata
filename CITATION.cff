@@ -5,7 +5,13 @@ authors:
   - family-names: Aji
     given-names: Shedrack Chiedozie
     orcid: "https://orcid.org/0009-0007-0823-2112"
-version: 0.1.0
+    affiliation: "Doztra Ltd"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.24247673"
+    description: "Zenodo concept DOI covering all archived releases"
+repository-code: "https://github.com/ashedrack/mandata"
+version: 0.4.24
 date-released: 2026-11-10
 url: "https://github.com/ashedrack/mandata"
 license: Apache-2.0

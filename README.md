@@ -1,6 +1,7 @@
 # Mandata
 
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/ashedrack/mandata/badge)](https://securityscorecards.dev/viewer/?uri=github.com/ashedrack/mandata)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24247673.svg)](https://doi.org/10.5281/zenodo.24247673)
 
 **The mandate toolkit for agent-initiated payments.**
 
@@ -108,6 +109,10 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [ ] TypeScript implementation — `ts/` is a 59-line pre-v0.3 scaffold, **not** an MMF implementation (never run against the vectors)
 
 ## Research
+
+Cite the software itself via Zenodo (archived releases, DOI resolves to latest):
+
+> Aji, S. C. (2026). *Mandata: The mandate toolkit for agent-initiated payments* [Software]. Zenodo. [doi:10.5281/zenodo.24247673](https://doi.org/10.5281/zenodo.24247673)
 
 This project is the open-source implementation arm of two papers by the author:
 
