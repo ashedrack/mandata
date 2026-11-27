@@ -4,6 +4,8 @@
 
 **The mandate toolkit for agent-initiated payments.**
 
+*Built and maintained by [Shedrack Chiedozie Aji](https://orcid.org/0009-0007-0823-2112) at [Doztra Ltd](https://doztra.ai). Mandata specifies and implements the Mandate Format (MMF), an open format for bounded spending authority in agentic payment systems.*
+
 When AI agents hold spending authority, someone must answer: *what exactly are they allowed to do — and can you prove it afterward?* Mandata is a reference implementation of the bounded-autonomy mandate chain:
 
 **principal → agent → credential → transaction → evidence**
@@ -107,9 +109,11 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 
 ## Research
 
-This project is the open-source implementation arm of the survey:
+This project is the open-source implementation arm of two papers by the author:
 
-> *Agentic AI in Payments and Financial Transactions: A Survey of Architectures, Safeguards and Open Problems* — S.C. Aji, 2026. [doi:10.13140/RG.2.2.13674.89288](https://doi.org/10.13140/RG.2.2.13674.89288)
+> *Mandata and the Mandate Format (MMF): Bounded Spending Authority for Agent-Initiated Payments* — S.C. Aji, 2026. [doi:10.13140/RG.2.2.29395.34083](https://doi.org/10.13140/RG.2.2.29395.34083)
+
+> *Agentic AI in Payments and Financial Transactions: A Survey of Architectures, Safeguards and Open Problems* — S.C. Aji & V. Palade, 2026. [doi:10.20944/preprints202611.2539.v1](https://doi.org/10.20944/preprints202611.2539.v1)
 
 ## Contributing
 
