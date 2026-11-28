@@ -5,9 +5,10 @@ Where to start depends on what you are trying to do.
 ## I want to use the library
 
 1. [README](../README.md) gives the install command and a working quickstart in about forty lines.
-2. [examples/basic_usage.py](../examples/basic_usage.py) shows the smallest complete flow: issue a mandate, enforce a transaction, read the decision.
-3. [examples/end_to_end.py](../examples/end_to_end.py) walks a full authorize, claim, settle cycle in one process.
-4. [examples/demo_app.py](../examples/demo_app.py) runs a simulated deployment over real HTTP: registry service, mock payment rail, delegation, revocation, and a full evidence audit at the end. Standard library only.
+2. [docs/api-reference.md](api-reference.md) lists the complete public API — every function and class, grouped by job, with a minimal example of each.
+3. [examples/basic_usage.py](../examples/basic_usage.py) shows the smallest complete flow: issue a mandate, enforce a transaction, read the decision.
+4. [examples/end_to_end.py](../examples/end_to_end.py) walks a full authorize, claim, settle cycle in one process.
+5. [examples/demo_app.py](../examples/demo_app.py) runs a simulated deployment over real HTTP: registry service, mock payment rail, delegation, revocation, and a full evidence audit at the end. Standard library only.
 
 ## I want to understand the model
 
