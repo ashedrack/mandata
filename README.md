@@ -106,7 +106,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full model, [`docs/ma
 - [x] **v0.4.10** — [MMF-v0.3.10](spec/mmf-v0.3.10.md): resolution-failure-as-result ordering; fixed REJECTED cause precedence; exact-bytes evidence (NFC removed); negative credential vectors C02–C06 — 74 vectors
 - [x] **v0.4.9** — [MMF-v0.3.9](spec/mmf-v0.3.9.md): ledger-lookup-first ordering made structural (chain re-resolved under serialization); normative `<OP>:<CAUSE>` on REJECTED evidence; cancellation-reference binding rules; credential golden vector C01 — 69 vectors
 - [x] **v0.4.8** — [MMF-v0.3.8](spec/mmf-v0.3.8.md): unified length-prefixed canonicalization for credentials + bounds_hash (delimiter-smuggling closed); `mandate_id` immutable-for-life + durable mandate preservation; timestamp edge cases; typed-equality integral rule
-- [ ] TypeScript implementation — `ts/` is a 59-line pre-v0.3 scaffold, **not** an MMF implementation (never run against the vectors)
+- [x] TypeScript implementation — full MMF-v0.3 port under `ts/` (PR #34), all 92 vectors byte-identical to the Python gate; published to npm as `@ashedrack/mandata`
 
 ## Research
 

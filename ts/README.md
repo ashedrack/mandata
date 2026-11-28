@@ -5,6 +5,10 @@ Python reference gate (mandata 0.4.x, MMF-v0.3). `Mandate` + `Bounds` define
 the authority, `enforce()` is the gate, `EvidenceLog` is the tamper-evident
 trail, `claim()`/`settle()`/`void()` cover the settlement lifecycle.
 
+## Install
+
+    npm install @ashedrack/mandata
+
 ## Status
 
 **Conformance-verified port.** `npm test` runs every vector in
