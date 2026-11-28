@@ -1,5 +1,5 @@
 {
-  "name": "mandata",
+  "name": "@ashedrack/mandata",
   "version": "0.4.24",
   "description": "Bounded spending authority for AI agents \u2014 the gate, not the rail.",
   "main": "dist/src/index.js",
