@@ -1,16 +1,39 @@
 {
   "name": "mandata",
-  "version": "0.4.0",
-  "description": "Bounded spending authority for AI agents — the gate, not the rail.",
+  "version": "0.4.24",
+  "description": "Bounded spending authority for AI agents \u2014 the gate, not the rail.",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "license": "Apache-2.0",
   "scripts": {
     "build": "tsc",
-    "test": "tsc && node --test dist/test/vectors.test.js"
+    "test": "tsc && node --test dist/test/vectors.test.js",
+    "prepublishOnly": "npm run build && npm test"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
     "typescript": "^5.4.0"
-  }
+  },
+  "author": "Shedrack Chiedozie Aji <shedrack.aji@doztra.ai>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ashedrack/mandata.git",
+    "directory": "ts"
+  },
+  "homepage": "https://doztra.ai/mandata",
+  "bugs": "https://github.com/ashedrack/mandata/issues",
+  "keywords": [
+    "mandate",
+    "mmf",
+    "agentic-payments",
+    "agent-payments",
+    "ap2",
+    "x402",
+    "bounded-autonomy",
+    "payment-authorization",
+    "llm-agents"
+  ],
+  "files": [
+    "dist/src"
+  ]
 }
